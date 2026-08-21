@@ -1,0 +1,23 @@
+{
+  "name": "smart-table-backend",
+  "version": "1.0.0",
+  "description": "Backend REST API and Database Service for SmartTable AI",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "seed": "node database/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.23.4",
+    "nodemailer": "^9.0.5",
+    "socket.io": "^4.8.3",
+    "sqlite3": "^5.1.7"
+  }
+}
