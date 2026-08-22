@@ -214,7 +214,7 @@ async function runHardValidationAudit() {
 
     // ── 5. CONCURRENT DOUBLE BOOKING PROTECTION (CRITICAL) ───────────────────
     console.log('\n--- 5. CONCURRENT DOUBLE BOOKING PROTECTION ---');
-    const concurrentDate = `2027-04-${Math.floor(10 + Math.random() * 15)}`;
+    const concurrentDate = `2027-05-${Math.floor(10 + Math.random() * 15)}`;
     const concurrentTable = 'ODR3';
     const concurrentTime = '19:30';
 

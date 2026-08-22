@@ -273,6 +273,11 @@ export const createReservation = async (req, res) => {
 
         io.to(`restaurant_${restaurantId}_public`).emit('new_reservation', createdReservationData);
         io.to(`restaurant_${restaurantId}_private`).emit('new_reservation', createdReservationData);
+        io.to(`restaurant_${restaurantId}_public`).emit('table_availability_updated', {
+          restaurantId,
+          date,
+          time
+        });
         io.to('admin_room').emit('new_reservation', createdReservationData);
       }
 
@@ -626,6 +631,12 @@ export const updateReservationStatus = async (req, res) => {
       io.to(`restaurant_${resItem.restaurant_id}_public`).emit('restaurant_occupancy_updated', {
         restaurantId: resItem.restaurant_id,
         metrics
+      });
+
+      io.to(`restaurant_${resItem.restaurant_id}_public`).emit('table_availability_updated', {
+        restaurantId: resItem.restaurant_id,
+        date: resItem.reservation_date,
+        time: resItem.reservation_time
       });
 
       const socketPayload = {

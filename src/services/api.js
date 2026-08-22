@@ -103,6 +103,24 @@ export const apiService = {
     }
   },
 
+  // Dedicated Table Availability Engine Endpoint
+  getRestaurantAvailability: async (restaurantId, { date, time, startTime, endTime, partySize, guestCount } = {}) => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (date) queryParams.append('date', date);
+      if (time || startTime) queryParams.append('time', time || startTime);
+      if (endTime) queryParams.append('endTime', endTime);
+      if (partySize || guestCount) queryParams.append('partySize', partySize || guestCount);
+
+      const url = `${API_BASE_URL}/tables/${restaurantId}/availability?${queryParams.toString()}`;
+      const res = await fetchWithTimeout(url);
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn('apiService.getRestaurantAvailability error:', err.message);
+      return { success: false, message: err.message };
+    }
+  },
+
   // 3. Table live status update (Floor Seating Radar)
   updateTableStatus: async (restaurantId, tableId, status, minsRemaining = null, reservationName = null) => {
     try {

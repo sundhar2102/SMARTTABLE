@@ -58,6 +58,35 @@ export const ReservationModal = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Live Backend Table Availability Engine State
+  const [availabilityData, setAvailabilityData] = useState(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+
+  const fetchAvailability = async () => {
+    if (!activeRestaurant) return;
+    setIsLoadingAvailability(true);
+    try {
+      const res = await apiService.getRestaurantAvailability(activeRestaurant.id, {
+        date,
+        time,
+        partySize
+      });
+      if (res?.success && res.data) {
+        setAvailabilityData(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch availability:', err.message);
+    } finally {
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    if (bookingModalOpen && activeRestaurant) {
+      fetchAvailability();
+    }
+  }, [bookingModalOpen, activeRestaurant?.id, date, time, partySize]);
+
   useEffect(() => {
     if (bookingModalOpen && user) {
       setGuestName(user.name || '');
@@ -314,6 +343,53 @@ export const ReservationModal = () => {
                 </div>
               </div>
 
+              {/* Dedicated Table Availability Engine Banner */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs space-y-2">
+                <div className="flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-2 text-white">
+                    <Table className="w-4 h-4 text-emerald-400" /> Real-Time Table Availability:
+                  </span>
+                  {isLoadingAvailability ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 animate-pulse border border-slate-700">
+                      Calculating backend availability...
+                    </span>
+                  ) : availabilityData ? (
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                      availabilityData.availableCount > 0 
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                    }`}>
+                      {availabilityData.availableCount > 0 
+                        ? `${availabilityData.availableCount} Table${availabilityData.availableCount > 1 ? 's' : ''} Available` 
+                        : 'No Tables Available'}
+                    </span>
+                  ) : null}
+                </div>
+
+                {availabilityData && (
+                  <div className="pt-0.5">
+                    {availabilityData.availableCount === 0 ? (
+                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                        <div>
+                          <p className="font-bold text-rose-200">No tables available for {time} on {date} ({partySize} guest{partySize > 1 ? 's' : ''}).</p>
+                          <p className="text-[11px] text-rose-300/80">Please select another time slot or date.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {availabilityData.availableTables.map(t => (
+                          <span key={t.id} className="px-2 py-0.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-[10px] font-semibold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            {t.name} ({t.capacity} seats)
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Party Size, Seating Preference & Date / Time */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -563,7 +639,7 @@ export const ReservationModal = () => {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (availabilityData && availabilityData.availableCount === 0)}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-gray-300 to-emerald-600 text-white text-xs font-bold shadow-lg shadow-gray-900/50 hover:brightness-110 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (

@@ -182,3 +182,121 @@ export const updateTableStatus = async (req, res) => {
     connection.release();
   }
 };
+
+export const getRestaurantAvailability = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const { date, startTime, time, endTime, partySize, guestCount } = req.query;
+
+    const reqDate = date || new Date().toISOString().split('T')[0];
+    const reqTime = startTime || time || '19:00';
+    const reqPartySize = Number(partySize || guestCount || 2);
+
+    // 1. Verify restaurant exists & is accepting reservations
+    const restaurant = await queryGet('SELECT * FROM restaurants WHERE id = ?', [restaurantId]);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found.' });
+    }
+
+    if (Number(restaurant.is_accepting_orders) === 0 || restaurant.status === 'deactivated') {
+      return res.status(400).json({
+        success: false,
+        message: 'Restaurant is deactivated or not accepting new table reservations.',
+        data: {
+          restaurantId,
+          date: reqDate,
+          time: reqTime,
+          partySize: reqPartySize,
+          totalTables: 0,
+          availableCount: 0,
+          availableTables: [],
+          unavailableTables: [],
+          isBookable: false
+        }
+      });
+    }
+
+    // 2. Fetch all tables belonging to the restaurant
+    const allTables = await queryAll(
+      'SELECT id, restaurant_id, name, capacity, section, status FROM `tables` WHERE restaurant_id = ? ORDER BY section, capacity, id',
+      [restaurantId]
+    );
+
+    // 3. Fetch active reservations for requested date with blocking statuses ('Pending', 'Confirmed', 'Accepted')
+    const activeReservations = await queryAll(
+      `SELECT * FROM reservations 
+       WHERE restaurant_id = ? 
+         AND reservation_date = ? 
+         AND status IN ('Pending', 'Confirmed', 'Accepted')`,
+      [restaurantId, reqDate]
+    );
+
+    const toMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const parts = String(timeStr).split(':').map(Number);
+      return (parts[0] || 0) * 60 + (parts[1] || 0);
+    };
+
+    const reqMinutes = toMinutes(reqTime);
+    const isOverlap = (t1, t2) => Math.abs(toMinutes(t1) - toMinutes(t2)) < 120; // 2 hour window
+
+    // 4. Calculate table availability
+    const availableTables = [];
+    const unavailableTables = [];
+
+    for (const table of allTables) {
+      // Capacity check
+      if (table.capacity < reqPartySize) {
+        unavailableTables.push({
+          id: table.id,
+          name: table.name,
+          capacity: table.capacity,
+          section: table.section,
+          reason: `Capacity (${table.capacity}) is less than requested party size (${reqPartySize}).`
+        });
+        continue;
+      }
+
+      // Overlapping active booking check
+      const blockingBooking = activeReservations.find(r => {
+        return r.table_id === table.id && isOverlap(r.reservation_time, reqTime);
+      });
+
+      if (blockingBooking) {
+        unavailableTables.push({
+          id: table.id,
+          name: table.name,
+          capacity: table.capacity,
+          section: table.section,
+          reason: `Already reserved at ${blockingBooking.reservation_time} (Booking ID: ${blockingBooking.id}, Status: ${blockingBooking.status}).`
+        });
+      } else {
+        availableTables.push({
+          id: table.id,
+          name: table.name,
+          capacity: table.capacity,
+          section: table.section,
+          status: table.status
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        restaurantId,
+        date: reqDate,
+        time: reqTime,
+        partySize: reqPartySize,
+        totalTables: allTables.length,
+        availableCount: availableTables.length,
+        availableTables,
+        unavailableTables,
+        isBookable: availableTables.length > 0
+      }
+    });
+  } catch (error) {
+    console.error('Error calculating table availability:', error);
+    return res.status(500).json({ success: false, message: 'Failed to calculate table availability.' });
+  }
+};

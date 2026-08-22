@@ -324,6 +324,11 @@ export const AppProvider = ({ children }) => {
       }));
     });
 
+    socket.on('table_availability_updated', (data) => {
+      console.log('[Socket] Received table_availability_updated:', data);
+      fetchLiveBackendData();
+    });
+
     socket.on('new_order', (data) => {
       console.log('[Socket] Received new_order:', data);
       
