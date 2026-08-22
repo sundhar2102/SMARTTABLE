@@ -213,3 +213,35 @@ CREATE TABLE IF NOT EXISTS `marketplace_settings` (
     `key`        VARCHAR(255) PRIMARY KEY,
     `value_json` JSON NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. Dining Sessions
+CREATE TABLE IF NOT EXISTS `dining_sessions` (
+    `id`            VARCHAR(255) PRIMARY KEY,
+    `booking_id`    VARCHAR(255) NOT NULL,
+    `restaurant_id` VARCHAR(255) NOT NULL,
+    `table_id`      VARCHAR(255) NOT NULL,
+    `user_id`       VARCHAR(255),
+    `guest_name`    VARCHAR(255) NOT NULL,
+    `party_size`    INT NOT NULL DEFAULT 2,
+    `status`        VARCHAR(50) NOT NULL DEFAULT 'active',
+    `started_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `ended_at`      TIMESTAMP NULL DEFAULT NULL,
+    `bill_amount`   DECIMAL(10, 2) DEFAULT 0.00,
+    FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`id`) ON DELETE CASCADE,
+    INDEX `idx_sessions_restaurant_table` (`restaurant_id`, `table_id`, `status`),
+    INDEX `idx_sessions_booking` (`booking_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. Notifications
+CREATE TABLE IF NOT EXISTS `notifications` (
+    `id`            VARCHAR(255) PRIMARY KEY,
+    `user_id`       VARCHAR(255),
+    `restaurant_id` VARCHAR(255),
+    `type`          VARCHAR(100) NOT NULL,
+    `title`         VARCHAR(255) NOT NULL,
+    `message`       TEXT NOT NULL,
+    `is_read`       TINYINT(1) DEFAULT 0,
+    `created_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_notifications_user` (`user_id`, `is_read`),
+    INDEX `idx_notifications_restaurant` (`restaurant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
