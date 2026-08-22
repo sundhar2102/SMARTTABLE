@@ -248,6 +248,15 @@ export const updateRestaurantStatus = async (req, res) => {
     await queryRun('UPDATE restaurants SET is_accepting_orders = ? WHERE id = ?', [isAcceptingOrders ? 1 : 0, id]);
 
     const updated = await queryGet('SELECT id, name, city, is_accepting_orders FROM restaurants WHERE id = ?', [id]);
+    
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant_${id}_public`).emit('restaurant_status_changed', {
+        id,
+        isAcceptingOrders: !!updated.is_accepting_orders
+      });
+    }
+
     return res.json({
       success: true,
       message: `Restaurant ${isAcceptingOrders ? 'activated' : 'suspended'}.`,

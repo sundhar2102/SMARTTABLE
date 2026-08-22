@@ -294,12 +294,75 @@ export const AppProvider = ({ children }) => {
       // Note: We might also want to update separate orders state if we have it
     });
 
+    socket.on('reservation_status_changed', (data) => {
+      console.log('[Socket] Received reservation_status_changed:', data);
+      setUserReservations(prev => prev.map(res => {
+        if (res.id === data.id) {
+          return { 
+            ...res, 
+            status: data.status || res.status,
+            orderStatus: data.orderStatus || data.order_status || res.orderStatus 
+          };
+        }
+        return res;
+      }));
+    });
+
+    socket.on('restaurant_status_changed', (data) => {
+      console.log('[Socket] Received restaurant_status_changed:', data);
+      setRestaurants(prev => prev.map(rest => {
+        if (rest.id === data.id) {
+          return {
+            ...rest,
+            crowdLevel: data.crowdLevel !== undefined ? data.crowdLevel : rest.crowdLevel,
+            waitEstimate: data.waitEstimate !== undefined ? data.waitEstimate : rest.waitEstimate,
+            aiWalkInProbability: data.aiWalkInProbability !== undefined ? data.aiWalkInProbability : rest.aiWalkInProbability,
+            isAcceptingOrders: data.isAcceptingOrders !== undefined ? data.isAcceptingOrders : rest.isAcceptingOrders
+          };
+        }
+        return rest;
+      }));
+    });
+
+    socket.on('new_order', (data) => {
+      console.log('[Socket] Received new_order:', data);
+      
+      const newReservation = {
+        id: data.id,
+        restaurantId: data.restaurant_id || data.restaurantId,
+        guestName: data.guest_name || data.guestName || 'Customer',
+        guestEmail: data.guest_email || 'N/A',
+        guestPhone: data.guest_phone || 'N/A',
+        date: data.created_at ? (data.created_at.includes('T') ? data.created_at.split('T')[0] : data.created_at.split(' ')[0]) : new Date().toISOString().split('T')[0],
+        time: data.created_at ? (data.created_at.includes('T') ? data.created_at.split('T')[1].substring(0, 5) : data.created_at.split(' ')[1]?.substring(0, 5) || '12:00') : '12:00',
+        partySize: 1,
+        tableId: data.table_id || data.tableId,
+        tableName: data.table_name || data.tableName || (data.fulfillment_type === 'takeaway' ? 'Takeaway' : 'Delivery'),
+        preOrderedItems: Array.isArray(data.items) ? data.items : (typeof data.pre_ordered_items_json === 'string' ? JSON.parse(data.pre_ordered_items_json || '[]') : data.pre_ordered_items_json || []),
+        billTotal: data.grand_total || data.grandTotal,
+        status: 'Confirmed',
+        orderStatus: data.order_status || data.orderStatus,
+        isOrderOnly: true
+      };
+
+      setUserReservations(prev => {
+        if (!prev.some(r => r.id === newReservation.id)) {
+           return [newReservation, ...prev];
+        }
+        return prev;
+      });
+      playOrderAlert('new');
+    });
+
     return () => {
       socket.off('connect', joinRoom);
       socket.emit('leave_restaurant', selectedRestaurantId);
       socket.off('table_status_changed');
       socket.off('restaurant_occupancy_updated');
       socket.off('order_status_changed');
+      socket.off('reservation_status_changed');
+      socket.off('restaurant_status_changed');
+      socket.off('new_order');
     };
   }, [socket, selectedRestaurantId]);
 

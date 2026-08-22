@@ -40,6 +40,7 @@ io.use(async (socket, next) => {
     // No token: allow as guest (public room access only)
     if (!token) {
       socket.user = { id: null, name: 'Guest', email: null, role: 'guest', restaurantId: null };
+      socket.data = { user: socket.user };
       return next();
     }
 
@@ -49,6 +50,7 @@ io.use(async (socket, next) => {
     if (!user) {
       // Token valid but user deleted — treat as guest
       socket.user = { id: null, name: 'Guest', email: null, role: 'guest', restaurantId: null };
+      socket.data = { user: socket.user };
       return next();
     }
 
@@ -59,6 +61,7 @@ io.use(async (socket, next) => {
       role: user.role,
       restaurantId: user.restaurant_id
     };
+    socket.data = { user: socket.user };
 
     next();
   } catch (err) {

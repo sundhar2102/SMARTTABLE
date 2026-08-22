@@ -286,6 +286,21 @@ export const updateRestaurantCrowdLevel = async (req, res) => {
       [crowdLevel, waitEstimate, walkInProb, id]
     );
 
+    const metrics = await calculateRestaurantMetrics(id);
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant_${id}_public`).emit('restaurant_status_changed', {
+        id,
+        crowdLevel,
+        waitEstimate,
+        aiWalkInProbability: walkInProb
+      });
+      io.to(`restaurant_${id}_public`).emit('restaurant_occupancy_updated', {
+        restaurantId: id,
+        metrics
+      });
+    }
+
     res.json({
       success: true,
       message: `Restaurant crowd level updated to ${crowdLevel}`,

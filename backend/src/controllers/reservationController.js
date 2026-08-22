@@ -351,6 +351,31 @@ export const updateOrderStatus = async (req, res) => {
         restaurantId: resItem.restaurant_id,
         metrics
       });
+
+      // Emit order status and reservation status change
+      io.to(`restaurant_${resItem.restaurant_id}_private`).emit('reservation_status_changed', {
+        id: resItem.id,
+        orderStatus: orderStatus,
+        status: resItem.status,
+        restaurantId: resItem.restaurant_id
+      });
+
+      try {
+        const sockets = await io.fetchSockets();
+        for (const s of sockets) {
+          const sUser = s.data?.user || s.user;
+          if (sUser && (sUser.email === resItem.guest_email || sUser.id === resItem.user_id)) {
+            s.emit('reservation_status_changed', {
+              id: resItem.id,
+              orderStatus: orderStatus,
+              status: resItem.status,
+              restaurantId: resItem.restaurant_id
+            });
+          }
+        }
+      } catch (socketErr) {
+        console.error('[Socket.io] Error fetching sockets:', socketErr.message);
+      }
     }
 
     res.json({
@@ -440,6 +465,32 @@ export const cancelReservation = async (req, res) => {
         restaurantId: resItem.restaurant_id,
         metrics
       });
+
+      // 1. Emit to restaurant private room for staff/owner
+      io.to(`restaurant_${resItem.restaurant_id}_private`).emit('reservation_status_changed', {
+        id: resItem.id,
+        status: 'Cancelled',
+        orderStatus: 'Cancelled',
+        restaurantId: resItem.restaurant_id
+      });
+
+      // 2. Emit directly to the specific customer socket if they are connected
+      try {
+        const sockets = await io.fetchSockets();
+        for (const s of sockets) {
+          const sUser = s.data?.user || s.user;
+          if (sUser && (sUser.email === resItem.guest_email || sUser.id === resItem.user_id)) {
+            s.emit('reservation_status_changed', {
+              id: resItem.id,
+              status: 'Cancelled',
+              orderStatus: 'Cancelled',
+              restaurantId: resItem.restaurant_id
+            });
+          }
+        }
+      } catch (socketErr) {
+        console.error('[Socket.io] Error fetching sockets for direct client emit:', socketErr.message);
+      }
     }
 
     res.json({ success: true, message: `Reservation ${id} cancelled successfully` });
