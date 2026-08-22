@@ -7,7 +7,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "seed": "node database/seed.js"
+    "seed": "node database/seed.js",
+    "test": "node test_phase11_analytics.js",
+    "test:security": "node test_phase8_security.js",
+    "test:reliability": "node test_phase9_reliability.js",
+    "test:phase6": "node test_phase6.js",
+    "test:all": "node test_phase6.js && node test_phase8_security.js && node test_phase9_reliability.js && node test_phase11_analytics.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

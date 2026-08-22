@@ -1,0 +1,89 @@
+name: SmartTable CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  frontend-build:
+    name: Frontend Build & Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Production Assets (Vite)
+        run: npm run build
+
+  backend-test:
+    name: Backend MySQL Integration & Automated Test Suites
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: smarttable
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Import Database Schema
+        run: |
+          mysql -h 127.0.0.1 -u root -P 3306 smarttable < backend/database/schema.mysql.sql
+
+      - name: Create Backend Environment Configuration
+        run: |
+          cat << 'EOF' > backend/.env
+          PORT=5000
+          NODE_ENV=test
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_USER=root
+          DB_PASSWORD=
+          DB_NAME=smarttable
+          JWT_SECRET=github-actions-ci-test-secret-key-2026-chennai-hyperlocal
+          BCRYPT_ROUNDS=10
+          EOF
+
+      - name: Start Backend Server in Background
+        run: |
+          cd backend
+          npm start &
+          sleep 5
+
+      - name: Run Full Automated Test Suite (Phases 6, 8, 9, 11)
+        run: |
+          cd backend
+          npm run test:all
