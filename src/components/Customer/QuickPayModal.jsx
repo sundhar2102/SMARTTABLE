@@ -13,8 +13,6 @@ import {
   UtensilsCrossed
 } from 'lucide-react';
 import { UpiPaymentQrCard, UPI_ID, PAYEE_NAME } from './UpiPaymentQrCard';
-import confetti from 'canvas-confetti';
-import { playOrderAlert } from '../../utils/audioUtils';
 
 export const QuickPayModal = () => {
   const { 
@@ -56,12 +54,7 @@ export const QuickPayModal = () => {
       };
       setTransactionDetails(details);
 
-      playOrderAlert('served');
-      try {
-        confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
-      } catch (e) {}
-
-      triggerToast('UPI Payment Verified! 💸', `₹${amount} paid to ${UPI_ID} successfully.`, 'info');
+      triggerToast('Payment verified', `₹${amount} paid to ${UPI_ID} successfully.`, 'info');
     }, 1200);
   };
 

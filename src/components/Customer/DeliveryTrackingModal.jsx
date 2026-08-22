@@ -20,7 +20,6 @@ import {
   AlertCircle,
   Volume2
 } from 'lucide-react';
-import { playOrderAlert } from '../../utils/audioUtils';
 import { TILE_LAYERS } from '../../services/mapConfig';
 
 // Helper component to auto-fit map bounds around origin, destination, and live rider
@@ -189,13 +188,6 @@ export const DeliveryTrackingModal = () => {
     [riderCoord.lat, riderCoord.lng],
     [destCoord.lat, destCoord.lng]
   ], [originCoord, riderCoord, destCoord]);
-
-  // Play subtle sound effect when status changes to Out for delivery
-  useEffect(() => {
-    if (deliveryTrackingOpen && order.currentStep === 4) {
-      playOrderAlert();
-    }
-  }, [deliveryTrackingOpen, order.currentStep]);
 
   if (!deliveryTrackingOpen) return null;
 

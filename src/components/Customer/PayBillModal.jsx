@@ -24,8 +24,6 @@ import {
   Smile,
   Check
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playOrderAlert } from '../../utils/audioUtils';
 import { UpiPaymentQrCard, UPI_ID } from './UpiPaymentQrCard';
 
 export const PayBillModal = () => {
@@ -124,12 +122,6 @@ export const PayBillModal = () => {
 
       // Settle in central AppContext
       settleBillPayment(activeBillReservation.id, paidData);
-
-      // Play success chime & confetti
-      playOrderAlert('served');
-      try {
-        confetti({ particleCount: 120, spread: 90, origin: { y: 0.5 } });
-      } catch (e) {}
     }, 1400);
   };
 

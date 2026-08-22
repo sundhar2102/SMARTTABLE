@@ -7,9 +7,7 @@ import {
   DEV_DEMO_ACCOUNTS
 } from '../data/mockData';
 import { apiService } from '../services/api';
-import { playOrderAlert } from '../utils/audioUtils';
 import { checkOAuthRedirectResult } from '../services/oauthService';
-import confetti from 'canvas-confetti';
 import { useSocket } from './SocketContext';
 
 const AppContext = createContext();
@@ -353,7 +351,7 @@ export const AppProvider = ({ children }) => {
         }
         return prev;
       });
-      playOrderAlert('new');
+      // Table occupancy updated
     });
 
     return () => {
@@ -508,13 +506,8 @@ export const AppProvider = ({ children }) => {
       const created = await apiService.createOrder(newOrder);
       if (created) {
         clearPreOrderItems();
-        playOrderAlert('accepted');
-        try {
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        } catch (e) {}
-        
         triggerToast(
-          'Order Placed! 🛵',
+          'Order Placed',
           `Your ${newOrder.fulfillmentType} order from ${rest.name} is now pending acceptance.`,
           'info'
         );
@@ -597,13 +590,8 @@ export const AppProvider = ({ children }) => {
       clearPreOrderItems();
       setBookingModalOpen(false);
 
-      playOrderAlert('accepted');
-      try {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-      } catch (e) {}
-
       triggerToast(
-        'Booking Request Submitted! ⏳',
+        'Booking Request Submitted',
         `Request sent to ${rest.name} for ${newReservation.date} at ${newReservation.time}. Waiting for restaurant owner approval.`,
         'info'
       );
@@ -668,11 +656,7 @@ export const AppProvider = ({ children }) => {
       updateTableStatus(target.restaurantId, target.tableId, 'available');
     }
 
-    try {
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-    } catch (e) {}
-
-    triggerToast('Payment Successful! 🎉', `Bill for reservation ${reservationId} settled via ${paymentMethod}.`, 'info');
+    triggerToast('Payment Successful', `Bill for reservation ${reservationId} settled via ${paymentMethod}.`, 'info');
   };
 
   // Open Quick Pay Modal
@@ -807,12 +791,6 @@ export const AppProvider = ({ children }) => {
       return res;
     }));
 
-    if (newStatus === 'Accepted') {
-      playOrderAlert('accepted');
-    } else if (newStatus === 'Seated & Served' || newStatus === 'Completed') {
-      playOrderAlert('served');
-    }
-
     try {
       if (String(reservationId).startsWith('ORD-')) {
         await apiService.updateOrder(reservationId, newStatus);
@@ -889,14 +867,9 @@ export const AppProvider = ({ children }) => {
         setViewMode('superadmin');
       }
 
-      playOrderAlert('accepted');
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch (e) {}
-
       triggerToast(
-        `Welcome, ${authUser.name}! 👋`,
-        `Signed in successfully to the ${authUser.role === 'admin' ? 'Platform Super Admin' : authUser.role === 'owner' ? 'Restaurant Owner' : 'Diner'} Portal.`,
+        'Login successful',
+        `Signed in to ${authUser.role === 'admin' ? 'Platform Super Admin' : authUser.role === 'owner' ? 'Restaurant Owner' : 'Diner'} Portal.`,
         'info'
       );
 
@@ -956,14 +929,9 @@ export const AppProvider = ({ children }) => {
       setViewMode('superadmin');
     }
 
-    playOrderAlert('accepted');
-    try {
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-    } catch (e) {}
-
     triggerToast(
-      `Welcome, ${authUser.name}! 🚀`,
-      `Successfully signed in with ${providerName}.`,
+      'Login successful',
+      `Signed in with ${providerName}.`,
       'info'
     );
 
@@ -1191,14 +1159,9 @@ export const AppProvider = ({ children }) => {
         window.location.hash = 'customer';
       }
 
-      playOrderAlert('accepted');
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch (e) {}
-
       triggerToast(
-        `Welcome to SmartTable, ${authUser.name}! 🎉`,
-        `Your ${finalRole === 'owner' ? 'Restaurant Owner Console' : 'Diner Account'} is ready.`,
+        'Account created successfully',
+        `Your account is ready.`,
         'info'
       );
 
@@ -1253,14 +1216,9 @@ export const AppProvider = ({ children }) => {
         window.location.hash = 'customer';
       }
 
-      playOrderAlert('accepted');
-      try {
-        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-      } catch (e) {}
-
       triggerToast(
-        `Welcome to SmartTable, ${authUser.name}! 🎉`,
-        `Your ${authUser.role === 'owner' ? 'Restaurant Owner Console' : 'Diner Account'} is ready.`,
+        'Verification successful',
+        `Your account is ready.`,
         'info'
       );
 
@@ -1345,7 +1303,7 @@ export const AppProvider = ({ children }) => {
     }));
 
     if (action === 'refunded') {
-      playOrderAlert('served');
+      // Order status updated
       triggerToast('Refund Processed 💳', `Refund issued via original gateway for dispute ${disputeId}.`, 'info');
     } else {
       triggerToast('Dispute Updated', `Case ${disputeId} marked as ${action.toUpperCase()}.`, 'info');
@@ -1570,14 +1528,9 @@ export const AppProvider = ({ children }) => {
 
     setSelectedRestaurantId(restSlug);
 
-    playOrderAlert('served');
-    try {
-      confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } });
-    } catch (e) {}
-
     triggerToast(
-      'Restaurant Approved & Launched! 🚀🎉',
-      `${app.name} is now LIVE on SmartTable! Diners can immediately book tables & view live radar!`,
+      'Restaurant approved successfully',
+      `${app.name} is now live on SmartTable.`,
       'info'
     );
   };

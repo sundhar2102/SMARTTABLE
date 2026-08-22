@@ -44,7 +44,6 @@ import {
   Calculator,
   RefreshCw
 } from 'lucide-react';
-import { playOrderAlert } from '../../utils/audioUtils';
 import { PaymentGatewayModal } from './PaymentGatewayModal';
 import { apiService } from '../../services/api';
 
@@ -216,11 +215,6 @@ export const AdminDashboard = () => {
 
   // Helper for quick order progression
   const handleProgressOrder = (resId, nextStatus) => {
-    if (soundAlertsEnabled) {
-      if (nextStatus === 'Accepted') playOrderAlert('accepted');
-      else if (nextStatus === 'Cooking') playOrderAlert('preparing');
-      else if (nextStatus === 'Served' || nextStatus === 'Completed') playOrderAlert('served');
-    }
     updateReservationOrderStatus(resId, nextStatus);
   };
 

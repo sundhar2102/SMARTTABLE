@@ -22,9 +22,6 @@ import {
   Check, 
   ChevronRight,
   AlertCircle
-} from 'lucide-react';
-import { playOrderAlert } from '../../utils/audioUtils';
-
 export const RiderDashboard = () => {
   const { 
     riders, 

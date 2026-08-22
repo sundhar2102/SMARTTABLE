@@ -14,9 +14,6 @@ import {
   Building,
   Zap
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playOrderAlert } from '../../utils/audioUtils';
-
 export const PaymentGatewayModal = ({ isOpen, onClose, billData, onPaymentSuccess }) => {
   const { triggerToast } = useApp();
 
@@ -66,14 +63,9 @@ export const PaymentGatewayModal = ({ isOpen, onClose, billData, onPaymentSucces
 
       setPaymentDetails(successPayload);
 
-      playOrderAlert('served');
-      try {
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.5 } });
-      } catch (err) {}
-
       triggerToast(
-        'Payment Collected Successfully! 💳✨',
-        `₹${totalAmount} settled via ${successPayload.gateway} (Ref: ${txnId}). Table marked for release!`,
+        'Payment collected successfully',
+        `₹${totalAmount} settled via ${successPayload.gateway} (Ref: ${txnId}).`,
         'info'
       );
 
