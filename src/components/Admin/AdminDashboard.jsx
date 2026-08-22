@@ -675,18 +675,18 @@ export const AdminDashboard = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => acceptReservation(res.id)}
-                            className="py-2.5 px-3 rounded-xl bg-black hover:bg-black text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                            className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs shadow-lg shadow-emerald-950 flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-emerald-400/30"
                           >
                             <Check className="w-3.5 h-3.5" />
-                            <span>Accept</span>
+                            <span>Accept Request</span>
                           </button>
 
                           <button
                             onClick={() => setDecliningResId(res.id)}
-                            className="py-2.5 px-3 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-black/40 text-rose-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                            className="py-2.5 px-3 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                           >
                             <X className="w-3.5 h-3.5" />
-                            <span>Decline</span>
+                            <span>Reject Request</span>
                           </button>
                         </div>
                       )}

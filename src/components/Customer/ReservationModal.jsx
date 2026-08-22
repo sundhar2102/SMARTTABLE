@@ -141,20 +141,20 @@ export const ReservationModal = () => {
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeRestaurant.name + ' ' + activeRestaurant.location)}&utm_campaign=gmp_git_agentskills_v1`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-black/30 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in">
+      <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-800 bg-gradient-to-r from-gray-950 via-gray-900 to-black">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/40">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gray-800 border border-gray-700 text-white">
-              <CalendarCheck className="w-6 h-6 text-white" />
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <CalendarCheck className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white tracking-tight">Instant Hotel Table Booking & Pre-Order</h3>
               <div className="flex items-center gap-2 text-xs text-slate-300 mt-0.5 flex-wrap">
-                <span className="font-semibold text-white">{activeRestaurant.name}</span>
-                <span className="text-gray-500">•</span>
+                <span className="font-semibold text-emerald-400">{activeRestaurant.name}</span>
+                <span className="text-slate-600">•</span>
                 <a 
                   href={mapsUrl}
                   target="_blank"
@@ -171,7 +171,7 @@ export const ReservationModal = () => {
 
           <button
             onClick={() => setBookingModalOpen(false)}
-            className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-gray-800/80 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all cursor-pointer border border-slate-700/50"
             aria-label="Close"
           >
             <X className="w-5 h-5" />

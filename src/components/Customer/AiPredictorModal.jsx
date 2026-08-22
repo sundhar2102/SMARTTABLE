@@ -46,29 +46,29 @@ export const AiPredictorModal = () => {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/80 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-gray-500/30 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/85 backdrop-blur-md animate-in fade-in">
+      <div className="relative w-full max-w-2xl bg-white rounded-3xl border border-black shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-800/80 bg-gradient-to-r from-indigo-950/50 via-purple-950/30 to-gray-950/80">
+        <div className="flex items-center justify-between p-6 border-b border-gray-300 bg-white">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-600/30 border border-gray-500/40 text-indigo-300">
-              <Bot className="w-6 h-6" />
+            <div className="p-2.5 rounded-2xl bg-white border border-black text-black">
+              <Bot className="w-6 h-6 text-black" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-white tracking-tight">AI Walk-in Table Predictor</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-500/20 text-indigo-300 border border-gray-500/30">
+                <h3 className="text-lg font-bold text-black tracking-tight">AI Walk-in Table Predictor</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-black border border-black">
                   Real-Time AI Engine
                 </span>
               </div>
-              <p className="text-xs text-gray-400">Calculate exact probability of securing a walk-in table without booking</p>
+              <p className="text-xs text-gray-600">Calculate exact probability of securing a walk-in table without booking</p>
             </div>
           </div>
 
           <button
             onClick={() => setAiPredictorOpen(false)}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/60 transition-all"
+            className="p-2 rounded-xl text-black hover:bg-gray-100 transition-all border border-gray-300"
           >
             <X className="w-5 h-5" />
           </button>

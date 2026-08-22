@@ -55,25 +55,25 @@ export const MyReservationsModal = () => {
           setMyBookingsOpen(false);
         }
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/85 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in"
     >
-      <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-gray-200">
+      <div className="relative w-full max-w-2xl glass-panel rounded-3xl border border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-100">
         
         {/* Modal Header */}
-        <div className="p-6 border-b border-gray-800 bg-gradient-to-r from-gray-950 via-gray-900 to-gray-900/30 flex items-center justify-between">
+        <div className="p-6 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/40 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-black/30 border border-gray-700 text-gray-200">
-              <Calendar className="w-6 h-6" />
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <Calendar className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white tracking-tight">My Table Reservations & Pre-Orders</h3>
-              <p className="text-xs text-gray-400">Live table seating verification, kitchen pre-order status & tableside digital bill pay</p>
+              <p className="text-xs text-slate-400">Live table seating verification, kitchen pre-order status & tableside digital bill pay</p>
             </div>
           </div>
 
           <button
             onClick={() => setMyBookingsOpen(false)}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/60 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all cursor-pointer border border-slate-700/50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -147,16 +147,21 @@ export const MyReservationsModal = () => {
 
                     <div className="flex items-center gap-2">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border flex items-center gap-1 ${
-                        res.orderStatus === 'Cooking'
-                          ? 'bg-gray-900 text-amber-300 border-gray-400/40 animate-pulse'
-                          : res.orderStatus === 'Served' || res.orderStatus === 'Completed'
-                          ? 'bg-teal-950 text-teal-300 border-gray-300/40'
-                          : res.orderStatus === 'Accepted'
-                          ? 'bg-indigo-950 text-indigo-300 border-gray-500/40'
-                          : 'bg-gray-900 text-gray-200 border-gray-700'
+                        res.status === 'Pending' || res.orderStatus === 'Pending' || res.orderStatus === 'Received'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
+                          : res.status === 'Accepted' || res.status === 'Confirmed' || res.orderStatus === 'Accepted'
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : res.status === 'Declined' || res.status === 'Rejected'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
                       }`}>
                         <Sparkles className="w-3 h-3" />
-                        <span>{res.orderStatus || res.status}</span>
+                        <span>
+                          {res.status === 'Pending' || res.orderStatus === 'Pending' || res.orderStatus === 'Received' ? '⏳ Pending Approval' :
+                           res.status === 'Accepted' || res.status === 'Confirmed' ? '✅ Confirmed' :
+                           res.status === 'Declined' || res.status === 'Rejected' ? '❌ Rejected' :
+                           res.orderStatus || res.status}
+                        </span>
                       </span>
 
                       {isConfirmed && !isPaid && (

@@ -47,23 +47,23 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+    <header className="sticky top-0 z-40 w-full bg-slate-950/85 backdrop-blur-xl border-b border-slate-800/80 shadow-2xl">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Left: Brand Logo */}
         <div 
           onClick={handleBrandClick}
-          className="flex items-center gap-2 cursor-pointer select-none group shrink-0"
+          className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0"
         >
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white transition-transform group-hover:scale-105 shadow-xs">
-            <UtensilsCrossed className="w-4 h-4 text-emerald-400" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white transition-all group-hover:scale-105 shadow-lg shadow-emerald-950/50 border border-emerald-400/30">
+            <UtensilsCrossed className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none">
+            <div className="flex items-center gap-2">
+              <span className="text-xl sm:text-2xl font-black text-white tracking-tight leading-none">
                 SmartTable
               </span>
-              <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+              <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-full shadow-xs">
                 LIVE
               </span>
             </div>

@@ -72,24 +72,24 @@ export const QuickPayModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-md glass-panel rounded-3xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-gray-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/85 backdrop-blur-md animate-in fade-in">
+      <div className="relative w-full max-w-md bg-white rounded-3xl border border-black shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-black">
         
         {/* Top Header */}
-        <div className="p-5 border-b border-gray-800 bg-gradient-to-r from-gray-950 via-gray-950 to-gray-950 flex items-center justify-between">
+        <div className="p-5 border-b border-gray-300 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gray-800 border border-gray-700 text-white">
-              <Zap className="w-5 h-5" />
+            <div className="p-2.5 rounded-2xl bg-white border border-black text-black">
+              <Zap className="w-5 h-5 text-black" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white tracking-tight">Instant UPI Payment QR</h3>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-gray-900 text-gray-200 border border-gray-700">
+                <h3 className="text-base font-bold text-black tracking-tight">Instant UPI Payment QR</h3>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-white text-black border border-black">
                   LIVE UPI
                 </span>
               </div>
-              <p className="text-xs text-gray-400">
-                Pay directly to <span className="font-mono text-white font-bold">{UPI_ID}</span>
+              <p className="text-xs text-gray-600">
+                Pay directly to <span className="font-mono text-black font-bold">{UPI_ID}</span>
               </p>
             </div>
           </div>

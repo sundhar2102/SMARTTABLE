@@ -603,8 +603,8 @@ export const AppProvider = ({ children }) => {
       } catch (e) {}
 
       triggerToast(
-        'Reservation Confirmed! 🎉',
-        `Table booked at ${rest.name} for ${newReservation.date} at ${newReservation.time}. Digital QR Pass ready!`,
+        'Booking Request Submitted! ⏳',
+        `Request sent to ${rest.name} for ${newReservation.date} at ${newReservation.time}. Waiting for restaurant owner approval.`,
         'info'
       );
 

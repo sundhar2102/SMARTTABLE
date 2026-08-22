@@ -83,18 +83,18 @@ export const CartDrawer = () => {
 
       {/* Drawer Container */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-[#0d131f] border-l border-gray-800 shadow-2xl flex flex-col justify-between overflow-hidden text-gray-200">
+        <div className="w-screen max-w-md bg-white border-l border-black shadow-2xl flex flex-col justify-between overflow-hidden text-black">
           
           {/* Top Header */}
-          <div className="p-5 border-b border-gray-800 bg-gradient-to-r from-gray-950 via-gray-900 to-indigo-950/40">
+          <div className="p-5 border-b border-gray-300 bg-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-gray-800 border border-gray-700 text-white">
-                  <ShoppingBag className="w-5 h-5" />
+                <div className="p-2 rounded-xl bg-white border border-black text-black">
+                  <ShoppingBag className="w-5 h-5 text-black" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">Your Hyperlocal Basket</h3>
-                  <p className="text-xs text-gray-400">
+                  <h3 className="text-base font-bold text-black tracking-tight">Your Hyperlocal Basket</h3>
+                  <p className="text-xs text-gray-600">
                     {cart.items.length > 0 ? `${targetRest?.name || cart.restaurantName}` : 'No items yet'}
                   </p>
                 </div>

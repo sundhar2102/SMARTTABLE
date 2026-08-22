@@ -199,7 +199,7 @@ export const createReservation = async (req, res) => {
           Number(partySize),
           date,
           time,
-          'Confirmed',
+          'Pending',
           orderStatus,
           specialRequests || 'None',
           JSON.stringify(preOrderedItems || []),
@@ -242,7 +242,7 @@ export const createReservation = async (req, res) => {
 
       return res.status(201).json({
         success: true,
-        message: 'Reservation confirmed successfully',
+        message: 'Reservation request submitted successfully. Awaiting owner approval.',
         data: {
           id: resId,
           restaurantId,
@@ -255,7 +255,7 @@ export const createReservation = async (req, res) => {
           partySize: Number(partySize),
           date,
           time,
-          status: 'Confirmed',
+          status: 'Pending',
           orderStatus,
           specialRequests: specialRequests || 'None',
           preOrderedItems: preOrderedItems || [],

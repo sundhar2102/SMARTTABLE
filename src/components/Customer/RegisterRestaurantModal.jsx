@@ -26,11 +26,10 @@ import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps
 import { getGoogleMapsApiKey, DEFAULT_MAP_ID, USAGE_ATTRIBUTION_ID } from '../../services/googleMapsConfig';
 
 const PRESET_IMAGES = [
-  { label: 'Fine Dining Ambient', url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Rooftop Deck & Lounge', url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Artisanal Cafe & Bakery', url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Traditional Indian Feast', url: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80' },
-  { label: 'Modern Asian & Sizzlers', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80' }
+  { label: 'Rooftop Sky Lounge', url: '/luxury_rooftop_dining.jpg' },
+  { label: 'Fine Dining Grand Hall', url: '/fine_dining_interior.jpg' },
+  { label: 'Artisanal Cafe & Bakery', url: '/artisanal_cafe_interior.jpg' },
+  { label: 'Luxury Hotel Buffet Spread', url: '/luxury_hotel_buffet.jpg' }
 ];
 
 export const RegisterRestaurantModal = () => {
@@ -92,23 +91,23 @@ export const RegisterRestaurantModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-950/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-xl glass-panel rounded-3xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-gray-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in">
+      <div className="relative w-full max-w-xl glass-panel rounded-3xl border border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-200">
         
         {/* Modal Top Header */}
-        <div className="p-5 sm:p-6 border-b border-gray-800 bg-gradient-to-r from-gray-950 via-gray-900 to-black flex items-center justify-between">
+        <div className="p-5 sm:p-6 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/40 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-gray-800 border border-gray-700 text-white">
-              <Store className="w-6 h-6 text-white" />
+            <div className="p-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <Store className="w-6 h-6 text-emerald-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Partner Restaurant Onboarding</h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-white text-gray-950 border border-white shadow-sm">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-xs">
                   STEP {step} OF 4
                 </span>
               </div>
-              <p className="text-xs text-slate-300 font-normal mt-0.5">
+              <p className="text-xs text-slate-400 font-normal mt-0.5">
                 Register your restaurant for live crowd radar, vacancy tracking & table bookings
               </p>
             </div>
@@ -116,7 +115,7 @@ export const RegisterRestaurantModal = () => {
 
           <button
             onClick={() => setRegisterRestaurantModalOpen(false)}
-            className="p-2 rounded-xl text-gray-300 hover:text-white hover:bg-gray-800/80 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-all cursor-pointer border border-slate-700/50"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -124,15 +123,15 @@ export const RegisterRestaurantModal = () => {
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-900 h-1.5 overflow-hidden">
+        <div className="w-full bg-slate-900 h-1.5 overflow-hidden">
           <div 
-            className="bg-gradient-to-r from-black to-white h-full transition-all duration-300"
+            className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-300 shadow-sm shadow-emerald-500/50"
             style={{ width: `${(step / 4) * 100}%` }}
           />
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1 text-xs text-slate-200">
           
           {/* STEP 1: Restaurant Identity */}
           {step === 1 && (
@@ -208,7 +207,7 @@ export const RegisterRestaurantModal = () => {
                 />
               </div>
 
-              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-gray-900/90 border border-gray-800 cursor-pointer">
+              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-white border border-gray-300 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.isPureVeg}
@@ -216,8 +215,8 @@ export const RegisterRestaurantModal = () => {
                   className="w-4 h-4 accent-black"
                 />
                 <div>
-                  <span className="font-bold text-white block">100% Pure Vegetarian Restaurant 🟢</span>
-                  <span className="text-[11px] text-gray-400">Strictly no non-veg items prepared in the kitchen</span>
+                  <span className="font-bold text-black block">100% Pure Vegetarian Restaurant 🟢</span>
+                  <span className="text-[11px] text-gray-600">Strictly no non-veg items prepared in the kitchen</span>
                 </div>
               </label>
             </div>
@@ -534,12 +533,12 @@ export const RegisterRestaurantModal = () => {
           )}
 
           {/* Modal Footer Controls */}
-          <div className="pt-4 border-t border-gray-800 flex items-center justify-between gap-3">
+          <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-gray-800"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-slate-700/80"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back
               </button>
@@ -550,7 +549,7 @@ export const RegisterRestaurantModal = () => {
                 type="button"
                 onClick={handleNext}
                 disabled={step === 1 && !formData.name.trim()}
-                className="px-5 py-2.5 rounded-xl bg-black hover:bg-black text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-lg shadow-gray-900/50"
+                className="btn-primary text-xs font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <span>Continue</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -558,7 +557,7 @@ export const RegisterRestaurantModal = () => {
             ) : (
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-gray-300 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xl shadow-gray-950 hover:brightness-110"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-lg shadow-emerald-950 hover:brightness-110"
               >
                 <Check className="w-4 h-4" />
                 <span>Submit Application for Approval 🚀</span>

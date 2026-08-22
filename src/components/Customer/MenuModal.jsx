@@ -280,7 +280,7 @@ export const MenuModal = () => {
                 setMenuModalOpen(false);
                 setBookingModalOpen(true);
               }}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-gray-300 to-indigo-600 text-white font-extrabold text-xs shadow-lg shadow-gray-900/50 flex items-center gap-2 cursor-pointer hover:brightness-110"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-950 flex items-center gap-2 cursor-pointer hover:brightness-110"
             >
               <CalendarCheck className="w-4 h-4" />
               <span>Book Table {preOrderTotalQty > 0 ? `with ${preOrderTotalQty} Pre-Orders (₹${preOrderTotal})` : 'Now'} ➔</span>
