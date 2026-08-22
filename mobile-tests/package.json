@@ -1,0 +1,14 @@
+{
+  "name": "smarttable-mobile-appium-tests",
+  "version": "1.0.0",
+  "description": "Appium & Mobile Web E2E Automation Framework for SmartTable AI",
+  "main": "runner.js",
+  "type": "module",
+  "scripts": {
+    "test:mobile": "node runner.js",
+    "test:appium": "node runner.js --mode=appium"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}

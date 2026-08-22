@@ -2,6 +2,17 @@ import { queryAll, queryGet, queryRun, getDb } from '../../database/db.js';
 import { calculateRestaurantMetrics } from '../utils/waitAlgorithm.js';
 import { invalidateRestaurantCache } from '../services/waitTimeService.js';
 
+export const getTablesByRestaurant = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const tables = await queryAll('SELECT * FROM `tables` WHERE restaurant_id = ? ORDER BY section, id', [restaurantId]);
+    return res.json({ success: true, data: tables });
+  } catch (error) {
+    console.error('Error fetching tables:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch tables' });
+  }
+};
+
 export const updateTableStatus = async (req, res) => {
   const db = await getDb();
   const connection = await db.getConnection();
