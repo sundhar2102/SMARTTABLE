@@ -354,6 +354,16 @@ export const AppProvider = ({ children }) => {
       // Table occupancy updated
     });
 
+    socket.on('new_reservation', (data) => {
+      console.log('[Socket] Received new_reservation:', data);
+      if (data && data.id) {
+        setUserReservations(prev => {
+          if (prev.some(r => r.id === data.id)) return prev;
+          return [data, ...prev];
+        });
+      }
+    });
+
     return () => {
       socket.off('connect', joinRoom);
       socket.emit('leave_restaurant', selectedRestaurantId);
@@ -363,6 +373,7 @@ export const AppProvider = ({ children }) => {
       socket.off('reservation_status_changed');
       socket.off('restaurant_status_changed');
       socket.off('new_order');
+      socket.off('new_reservation');
     };
   }, [socket, selectedRestaurantId]);
 
@@ -1311,16 +1322,35 @@ export const AppProvider = ({ children }) => {
   };
 
   // Restaurant Owner: Accept or Decline Reservation / Order Request
-  const acceptReservation = (reservationId) => {
-    updateReservationOrderStatus(reservationId, 'Accepted');
-  };
-
-  const declineReservation = (reservationId, reason = 'Table capacity full at requested slot') => {
+  const acceptReservation = async (reservationId) => {
     setUserReservations(prev => prev.map(r => {
       if (r.id === reservationId) {
         return {
           ...r,
-          status: 'Declined',
+          status: 'Confirmed',
+          orderStatus: 'Accepted'
+        };
+      }
+      return r;
+    }));
+
+    try {
+      const res = await apiService.updateReservationStatus(reservationId, 'Confirmed');
+      if (res && res.success) {
+        triggerToast('Booking Confirmed', `Reservation ${reservationId} has been confirmed.`, 'info');
+      }
+    } catch (err) {
+      console.error('Error accepting reservation:', err);
+      triggerToast('Update Failed', err.message || 'Could not confirm reservation.', 'alert');
+    }
+  };
+
+  const declineReservation = async (reservationId, reason = 'Table capacity full at requested slot') => {
+    setUserReservations(prev => prev.map(r => {
+      if (r.id === reservationId) {
+        return {
+          ...r,
+          status: 'Rejected',
           orderStatus: 'Declined',
           declineReason: reason
         };
@@ -1333,7 +1363,15 @@ export const AppProvider = ({ children }) => {
       updateTableStatus(target.restaurantId, target.tableId, 'available');
     }
 
-    triggerToast('Reservation Declined', `Request ${reservationId} has been declined (${reason}).`, 'alert');
+    try {
+      const res = await apiService.updateReservationStatus(reservationId, 'Rejected', reason);
+      if (res && res.success) {
+        triggerToast('Reservation Rejected', `Request ${reservationId} has been rejected.`, 'alert');
+      }
+    } catch (err) {
+      console.error('Error declining reservation:', err);
+      triggerToast('Update Failed', err.message || 'Could not reject reservation.', 'alert');
+    }
   };
 
   // Restaurant Owner: Table Bill Manager

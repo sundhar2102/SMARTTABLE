@@ -188,7 +188,7 @@ export const AdminDashboard = () => {
   const filteredReservations = currentRestReservations.filter(res => {
     if (orderStatusFilter !== 'all') {
       if (orderStatusFilter === 'Pending') {
-        if (res.orderStatus !== 'Received' && res.orderStatus !== 'Table Reserved' && res.orderStatus !== 'Pending Acceptance') return false;
+        if (res.status !== 'Pending' && res.orderStatus !== 'Pending' && res.orderStatus !== 'Received' && res.orderStatus !== 'Table Reserved' && res.orderStatus !== 'Pending Acceptance') return false;
       } else if (orderStatusFilter === 'Cooking') {
         if (res.orderStatus !== 'Cooking') return false;
       } else if (res.orderStatus !== orderStatusFilter) {
@@ -575,7 +575,7 @@ export const AdminDashboard = () => {
               </div>
             ) : (
               filteredReservations.map(res => {
-                const isPending = res.orderStatus === 'Received' || res.orderStatus === 'Table Reserved' || res.orderStatus === 'Pending Acceptance';
+                const isPending = res.status === 'Pending' || res.orderStatus === 'Pending' || res.orderStatus === 'Received' || res.orderStatus === 'Table Reserved' || res.orderStatus === 'Pending Acceptance';
                 const isAccepted = res.orderStatus === 'Accepted';
                 const isCooking = res.orderStatus === 'Cooking';
                 const isDone = res.orderStatus === 'Served' || res.orderStatus === 'Completed';

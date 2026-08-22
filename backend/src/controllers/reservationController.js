@@ -223,6 +223,27 @@ export const createReservation = async (req, res) => {
       invalidateRestaurantCache(restaurantId);
       const metrics = await calculateRestaurantMetrics(restaurantId);
 
+      const createdReservationData = {
+        id: resId,
+        restaurantId,
+        restaurantName: restaurantName || 'Restaurant',
+        tableId: assignedTable.id,
+        tableName: assignedTable.name,
+        guestName: finalName,
+        guestEmail: finalEmail,
+        guestPhone: guestPhone || '',
+        partySize: Number(partySize),
+        date,
+        time,
+        status: 'Pending',
+        orderStatus,
+        specialRequests: specialRequests || 'None',
+        preOrderedItems: preOrderedItems || [],
+        qrCode,
+        createdAt: now.toISOString(),
+        userId
+      };
+
       const io = req.app.get('io');
       if (io) {
         if (shouldUpdateLiveStatus) {
@@ -238,30 +259,16 @@ export const createReservation = async (req, res) => {
           restaurantId,
           metrics
         });
+
+        io.to(`restaurant_${restaurantId}_public`).emit('new_reservation', createdReservationData);
+        io.to(`restaurant_${restaurantId}_private`).emit('new_reservation', createdReservationData);
+        io.to('admin_room').emit('new_reservation', createdReservationData);
       }
 
       return res.status(201).json({
         success: true,
         message: 'Reservation request submitted successfully. Awaiting owner approval.',
-        data: {
-          id: resId,
-          restaurantId,
-          restaurantName,
-          tableId: assignedTable.id,
-          tableName: assignedTable.name,
-          guestName: finalName,
-          guestEmail: finalEmail,
-          guestPhone: guestPhone || '',
-          partySize: Number(partySize),
-          date,
-          time,
-          status: 'Pending',
-          orderStatus,
-          specialRequests: specialRequests || 'None',
-          preOrderedItems: preOrderedItems || [],
-          qrCode,
-          createdAt: now.toISOString()
-        }
+        data: createdReservationData
       });
 
     } catch (error) {
@@ -530,6 +537,121 @@ export const cancelReservation = async (req, res) => {
   } catch (error) {
     await connection.rollback();
     console.error('Error in cancelReservation:', error);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+export const updateReservationStatus = async (req, res) => {
+  const db = await getDb();
+  const connection = await db.getConnection();
+
+  try {
+    const { id } = req.params;
+    const { status, reason, specialRequests } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'Status is required.' });
+    }
+
+    await connection.beginTransaction();
+
+    const [resRows] = await connection.query('SELECT * FROM reservations WHERE id = ? FOR UPDATE', [id]);
+    if (resRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'Reservation not found.' });
+    }
+
+    const resItem = resRows[0];
+    const newStatus = status === 'Confirmed' || status === 'Accepted' ? 'Confirmed' :
+                      status === 'Rejected' || status === 'Declined' ? 'Rejected' : status;
+    const newOrderStatus = newStatus === 'Confirmed' ? 'Accepted' :
+                           newStatus === 'Rejected' ? 'Declined' : newStatus;
+
+    await connection.query(
+      'UPDATE reservations SET status = ?, order_status = ?, special_requests = COALESCE(?, special_requests) WHERE id = ?',
+      [newStatus, newOrderStatus, reason || specialRequests || null, id]
+    );
+
+    await connection.query(
+      'UPDATE orders SET status = ?, order_status = ? WHERE booking_id = ?',
+      [newStatus, newOrderStatus, id]
+    );
+
+    let tableStatusChanged = false;
+    if (newStatus === 'Rejected' || newStatus === 'Declined' || newStatus === 'Cancelled') {
+      if (resItem.table_id && resItem.table_id !== 'Auto-Assigned') {
+        await connection.query(
+          "UPDATE `tables` SET status = 'available', reservation_name = NULL WHERE id = ? AND restaurant_id = ? AND status = 'reserved'",
+          [resItem.table_id, resItem.restaurant_id]
+        );
+        tableStatusChanged = true;
+      }
+    } else if (newStatus === 'Confirmed') {
+      if (resItem.table_id && resItem.table_id !== 'Auto-Assigned') {
+        await connection.query(
+          "UPDATE `tables` SET status = 'reserved', reservation_name = ? WHERE id = ? AND restaurant_id = ?",
+          [`${resItem.guest_name} (${resItem.reservation_time})`, resItem.table_id, resItem.restaurant_id]
+        );
+        tableStatusChanged = true;
+      }
+    }
+
+    await connection.commit();
+
+    invalidateRestaurantCache(resItem.restaurant_id);
+    const metrics = await calculateRestaurantMetrics(resItem.restaurant_id);
+
+    const io = req.app.get('io');
+    if (io) {
+      if (tableStatusChanged) {
+        io.to(`restaurant_${resItem.restaurant_id}_public`).emit('table_status_changed', {
+          tableId: resItem.table_id,
+          restaurantId: resItem.restaurant_id,
+          status: newStatus === 'Confirmed' ? 'reserved' : 'available',
+          minsRemaining: null
+        });
+      }
+
+      io.to(`restaurant_${resItem.restaurant_id}_public`).emit('restaurant_occupancy_updated', {
+        restaurantId: resItem.restaurant_id,
+        metrics
+      });
+
+      const socketPayload = {
+        id: resItem.id,
+        status: newStatus,
+        orderStatus: newOrderStatus,
+        restaurantId: resItem.restaurant_id
+      };
+
+      io.to(`restaurant_${resItem.restaurant_id}_public`).emit('reservation_status_changed', socketPayload);
+      io.to(`restaurant_${resItem.restaurant_id}_private`).emit('reservation_status_changed', socketPayload);
+      io.to('admin_room').emit('reservation_status_changed', socketPayload);
+
+      try {
+        const sockets = await io.fetchSockets();
+        for (const s of sockets) {
+          const sUser = s.data?.user || s.user;
+          if (sUser && (sUser.email === resItem.guest_email || sUser.id === resItem.user_id)) {
+            s.emit('reservation_status_changed', socketPayload);
+          }
+        }
+      } catch (socketErr) {
+        console.error('[Socket.io] Error fetching sockets for direct client emit:', socketErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Reservation ${id} updated to status "${newStatus}"`,
+      data: { id, status: newStatus, orderStatus: newOrderStatus }
+    });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error in updateReservationStatus:', error);
     res.status(500).json({ success: false, message: error.message });
   } finally {
     connection.release();

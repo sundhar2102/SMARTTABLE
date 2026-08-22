@@ -181,6 +181,20 @@ export const apiService = {
     }
   },
 
+  updateReservationStatus: async (id, status, reason = null) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/reservations/${id}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status, reason })
+      });
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn(`apiService.updateReservationStatus(${id}) error:`, err.message);
+      return null;
+    }
+  },
+
   cancelReservation: async (id) => {
     try {
       const res = await fetchWithTimeout(`${API_BASE_URL}/reservations/${id}`, {
