@@ -5,7 +5,8 @@ import {
   getAllReservations, 
   cancelReservation,
   updateOrderStatus,
-  updateReservationStatus
+  updateReservationStatus,
+  checkInReservation
 } from '../controllers/reservationController.js';
 
 const router = express.Router();
@@ -14,6 +15,7 @@ router.use(requireAuth);
 
 router.get('/', getAllReservations);
 router.post('/', createReservation);
+router.post('/:id/checkin', requireRole('owner', 'admin'), requireRestaurantOwnership, checkInReservation);
 router.patch('/:id/order-status', requireRole('owner', 'admin'), requireRestaurantOwnership, updateOrderStatus);
 router.patch('/:id/status', requireRole('owner', 'admin'), requireRestaurantOwnership, updateReservationStatus);
 router.delete('/:id', cancelReservation);

@@ -6,7 +6,23 @@ export const getTablesByRestaurant = async (req, res) => {
   try {
     const { restaurantId } = req.params;
     const tables = await queryAll('SELECT * FROM `tables` WHERE restaurant_id = ? ORDER BY section, id', [restaurantId]);
-    return res.json({ success: true, data: tables });
+    
+    // Enrich occupied/cleaning tables with telemetry if missing
+    const enrichedTables = tables.map(t => {
+      let minsRemaining = t.mins_remaining;
+      if (t.status === 'occupied' && (minsRemaining === null || minsRemaining === undefined)) {
+        minsRemaining = 30;
+      } else if (t.status === 'cleaning' && (minsRemaining === null || minsRemaining === undefined)) {
+        minsRemaining = 5;
+      }
+      return {
+        ...t,
+        mins_remaining: minsRemaining,
+        minsRemaining
+      };
+    });
+
+    return res.json({ success: true, data: enrichedTables });
   } catch (error) {
     console.error('Error fetching tables:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch tables' });

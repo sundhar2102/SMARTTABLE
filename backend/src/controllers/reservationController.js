@@ -180,15 +180,14 @@ export const createReservation = async (req, res) => {
           await connection.rollback();
           return res.status(409).json({
             success: false,
-            message: 'No available tables found for the selected time and party size.'
+            message: 'No available tables matching your requested party size and time slot.'
           });
         }
 
-        const exactMatch = availableTables.filter(t => t.capacity >= Number(partySize) && t.capacity <= Number(partySize) + 2);
-        const suitableTables = exactMatch.length > 0 ? exactMatch : availableTables;
-
-        suitableTables.sort((a, b) => a.capacity - b.capacity);
-        assignedTable = suitableTables[0];
+        // Smart Table Allocation Algorithm: Sort available tables by closest capacity match
+        // (Prefers a 2-person table for party of 2 over blocking a 6-person table)
+        availableTables.sort((a, b) => (a.capacity - Number(partySize)) - (b.capacity - Number(partySize)));
+        assignedTable = availableTables[0];
       }
 
       await connection.query(
@@ -675,5 +674,61 @@ export const updateReservationStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   } finally {
     connection.release();
+  }
+};
+
+export const checkInReservation = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const booking = await queryGet('SELECT * FROM reservations WHERE id = ?', [id]);
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: `Reservation ${id} not found.` });
+    }
+
+    // Enforce tenant isolation if user is an owner
+    if (req.user && req.user.role === 'owner' && req.user.restaurantId !== booking.restaurant_id) {
+      return res.status(403).json({ success: false, message: 'Forbidden: You can only check in reservations for your own restaurant.' });
+    }
+
+    // Update reservation status to Seated & Order Status to Cooking
+    await queryRun(
+      "UPDATE reservations SET status = 'Seated', order_status = 'Cooking' WHERE id = ?",
+      [id]
+    );
+
+    // Update assigned table status to occupied
+    if (booking.table_id) {
+      await queryRun(
+        "UPDATE `tables` SET status = 'occupied', occupied_at = CURRENT_TIMESTAMP WHERE id = ? AND restaurant_id = ?",
+        [booking.table_id, booking.restaurant_id]
+      );
+    }
+
+    invalidateRestaurantCache(booking.restaurant_id);
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`restaurant_${booking.restaurant_id}_public`).emit('table_status_changed', {
+        tableId: booking.table_id,
+        restaurantId: booking.restaurant_id,
+        status: 'occupied'
+      });
+      io.to(`restaurant_${booking.restaurant_id}_private`).emit('reservation_status_changed', {
+        id: booking.id,
+        status: 'Seated',
+        orderStatus: 'Cooking'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Reservation ${id} checked in successfully. Table ${booking.table_id} is now OCCUPIED.`,
+      data: { id, status: 'Seated', tableId: booking.table_id }
+    });
+
+  } catch (error) {
+    console.error('Error in checkInReservation:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

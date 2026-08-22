@@ -229,19 +229,20 @@ export const MyReservationsModal = () => {
                         <span className="text-xs font-black text-white">Bill Subtotal: ₹{orderTotal.toLocaleString('en-IN')}</span>
                       </div>
 
-                      {/* Live Status Milestone Stepper */}
-                      <div className="grid grid-cols-4 gap-1 text-center text-[10px] font-semibold pt-1">
+                      {/* Full Customer Booking Lifecycle Stepper */}
+                      <div className="grid grid-cols-5 gap-1 text-center text-[9px] font-semibold pt-1">
                         {[
-                          { step: 1, label: 'Received' },
-                          { step: 2, label: 'Kitchen Accepted' },
-                          { step: 3, label: 'Freshly Cooking' },
-                          { step: 4, label: 'Served at Table' }
+                          { step: 1, label: '1. Booked' },
+                          { step: 2, label: '2. Confirmed' },
+                          { step: 3, label: hasPreOrder ? '3. Pre-Ordered' : '3. Table Reserved' },
+                          { step: 4, label: '4. Seated & Served' },
+                          { step: 5, label: '5. Completed' }
                         ].map(s => (
                           <div 
                             key={s.step} 
                             className={`p-1.5 rounded-lg border transition-all ${
                               currentStep >= s.step 
-                                ? 'bg-gray-900/80 border-black/50 text-gray-200 font-bold' 
+                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold' 
                                 : 'bg-gray-900/50 border-gray-800 text-gray-500'
                             }`}
                           >

@@ -118,3 +118,46 @@ export const reconcileCleaningTables = async (io = null) => {
     console.error('[Reconciliation Error]:', err.message);
   }
 };
+
+/**
+ * Sweeps active reservations to automatically release tables for 15-minute no-shows.
+ * If diner does not check in within 15 minutes of reservation time, table status is set to 'available'.
+ */
+export const reconcileNoShowReservations = async (io = null) => {
+  try {
+    const noShowReservations = await queryAll(`
+      SELECT * FROM reservations
+      WHERE status IN ('Pending', 'Confirmed')
+        AND TIMESTAMP(CONCAT(reservation_date, ' ', reservation_time)) <= SUBDATE(NOW(), INTERVAL 15 MINUTE)
+    `);
+
+    if (noShowReservations.length > 0) {
+      for (const r of noShowReservations) {
+        console.log(`[No-Show Auto-Release] Reservation ${r.id} at ${r.restaurant_id} expired 15-min grace window. Releasing table ${r.table_id}.`);
+        
+        await queryRun("UPDATE reservations SET status = 'Cancelled', order_status = 'Cancelled' WHERE id = ?", [r.id]);
+        
+        if (r.table_id) {
+          await queryRun("UPDATE `tables` SET status = 'available' WHERE id = ? AND restaurant_id = ?", [r.table_id, r.restaurant_id]);
+        }
+
+        invalidateRestaurantCache(r.restaurant_id);
+
+        if (io) {
+          io.to(`restaurant_${r.restaurant_id}_public`).emit('table_status_changed', {
+            tableId: r.table_id,
+            restaurantId: r.restaurant_id,
+            status: 'available'
+          });
+          io.to(`restaurant_${r.restaurant_id}_private`).emit('reservation_status_changed', {
+            id: r.id,
+            status: 'Cancelled',
+            orderStatus: 'Cancelled'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[No-Show Reconciliation Error]:', err.message);
+  }
+};
