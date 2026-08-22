@@ -20,7 +20,8 @@ import {
   Store,
   ExternalLink,
   CreditCard,
-  Receipt
+  Receipt,
+  Copy
 } from 'lucide-react';
 
 export const MyReservationsModal = () => {
@@ -127,22 +128,39 @@ export const MyReservationsModal = () => {
                   }`}
                 >
                   
+                  {/* Prominent Booked Code Header Banner */}
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/40 border border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-mono tracking-wider font-semibold block">BOOKED CODE / PASS ID</span>
+                      <div className="font-mono text-base font-extrabold text-emerald-400 tracking-wider flex items-center gap-2">
+                        <span>{res.id || res.qrCode || `ST-RES-${res.id}`}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setActiveQrModal(res)}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                    >
+                      <QrCode className="w-4 h-4 text-emerald-400" />
+                      <span>View QR Pass</span>
+                    </button>
+                  </div>
+                  
                   {/* Top Row: Restaurant Name & Reservation Status */}
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-gray-400 uppercase font-mono tracking-wider">{res.id}</span>
-                        <span className="px-2 py-0.2 rounded-full text-[9px] font-bold uppercase bg-gray-900 text-gray-200 border border-gray-700">
+                        <span className="px-2 py-0.2 rounded-full text-[9px] font-bold uppercase bg-slate-900 text-slate-200 border border-slate-700">
                           🍽️ Dine-In Table
                         </span>
                         {isPaid && (
-                          <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-teal-950 text-teal-300 border border-gray-300/40 flex items-center gap-1">
+                          <span className="px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase bg-teal-950 text-teal-300 border border-slate-300/40 flex items-center gap-1">
                             <Check className="w-2.5 h-2.5" /> PAID ONLINE
                           </span>
                         )}
                       </div>
                       <h4 className="text-base font-bold text-white tracking-tight mt-0.5">{res.restaurantName}</h4>
-                      <p className="text-xs text-gray-400">{res.restaurantLocation}</p>
+                      <p className="text-xs text-slate-400">{res.restaurantLocation}</p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -167,7 +185,7 @@ export const MyReservationsModal = () => {
                       {isConfirmed && !isPaid && (
                         <button
                           onClick={() => cancelReservation(res.id)}
-                          className="text-[10px] text-gray-300 hover:text-rose-300 hover:underline font-semibold cursor-pointer"
+                          className="text-[10px] text-slate-300 hover:text-rose-300 hover:underline font-semibold cursor-pointer"
                         >
                           Cancel Table
                         </button>

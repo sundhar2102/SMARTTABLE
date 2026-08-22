@@ -85,24 +85,24 @@ export const QuickPayModal = () => {
         <div className="p-5 border-b border-gray-300 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-white border border-black text-black">
-              <Zap className="w-5 h-5 text-black" />
+              <Receipt className="w-5 h-5 text-black" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-black tracking-tight">Instant UPI Payment QR</h3>
+                <h3 className="text-base font-bold text-black tracking-tight">Tableside Digital Checkout</h3>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-white text-black border border-black">
-                  LIVE UPI
+                  INSTANT SETTLEMENT
                 </span>
               </div>
               <p className="text-xs text-gray-600">
-                Pay directly to <span className="font-mono text-black font-bold">{UPI_ID}</span>
+                Direct tableside digital bill payment
               </p>
             </div>
           </div>
 
           <button
             onClick={handleClose}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/60 transition-all cursor-pointer"
+            className="p-2 rounded-xl text-gray-400 hover:text-black transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -219,13 +219,25 @@ export const QuickPayModal = () => {
                 />
               </div>
 
-              {/* QR Code Card */}
-              <UpiPaymentQrCard 
-                amount={amount}
-                note={customNote}
-                onPaymentSuccess={handlePaymentSuccess}
-                isProcessing={isProcessing}
-              />
+              {/* Direct Checkout Action Button */}
+              <button
+                type="button"
+                onClick={handlePaymentSuccess}
+                disabled={isProcessing || !amount || amount <= 0}
+                className="w-full py-3.5 rounded-2xl bg-black hover:bg-slate-800 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processing Digital Settlement...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>Confirm Tableside Settlement (₹{Number(amount || 0).toLocaleString('en-IN')})</span>
+                  </>
+                )}
+              </button>
 
             </div>
           )}

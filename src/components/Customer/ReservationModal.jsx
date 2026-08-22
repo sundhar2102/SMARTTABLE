@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import { 
   CalendarCheck, 
   X, 
@@ -25,7 +26,10 @@ import {
   Leaf,
   Star,
   Flame,
-  ChevronDown
+  ChevronDown,
+  QrCode,
+  Copy,
+  Check
 } from 'lucide-react';
 
 export const ReservationModal = () => {
@@ -57,6 +61,8 @@ export const ReservationModal = () => {
   const [preOrderCart, setPreOrderCart] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Live Backend Table Availability Engine State
   const [availabilityData, setAvailabilityData] = useState(null);
@@ -97,12 +103,16 @@ export const ReservationModal = () => {
 
   if (!bookingModalOpen || !activeRestaurant) return null;
 
+  const handleClose = () => {
+    setConfirmedBooking(null);
+    setBookingModalOpen(false);
+  };
+
   // Handle Restaurant Change
   const handleRestaurantChange = (restId) => {
     setSelectedRestaurantId(restId);
     setPreferredSection('Any Section (Best Available)');
     setErrorMessage('');
-    // Optional: Keep or reset pre-order cart
     setPreOrderCart({});
   };
 
@@ -154,8 +164,17 @@ export const ReservationModal = () => {
         preOrderedItems: preOrderList
       });
       if (res && res.success) {
-        setBookingModalOpen(false);
-        setMyBookingsOpen(true);
+        setConfirmedBooking(res.data || res.reservation || {
+          id: `ST-RES-${Math.floor(100000 + Math.random() * 900000)}`,
+          qrCode: res.data?.qrCode || `ST-${Math.floor(100000 + Math.random() * 900000)}`,
+          restaurantName: activeRestaurant.name,
+          tableName: res.data?.tableName || 'Table Auto-Allocated',
+          date,
+          time,
+          partySize,
+          guestName,
+          status: 'Pending'
+        });
       } else {
         setErrorMessage(res?.error || 'Failed to make reservation.');
       }
@@ -169,6 +188,94 @@ export const ReservationModal = () => {
   const mapsUrl = activeRestaurant.googleMapsUrl 
     ? `${activeRestaurant.googleMapsUrl}&utm_campaign=gmp_git_agentskills_v1`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activeRestaurant.name + ' ' + activeRestaurant.location)}&utm_campaign=gmp_git_agentskills_v1`;
+
+  if (confirmedBooking) {
+    const bookingCode = confirmedBooking.id || confirmedBooking.qrCode || `ST-RES-${Math.floor(100000 + Math.random() * 900000)}`;
+    const passQrCode = confirmedBooking.qrCode || bookingCode;
+
+    const copyCode = () => {
+      navigator.clipboard.writeText(bookingCode);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2500);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in">
+        <div className="relative w-full max-w-lg glass-panel rounded-3xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col p-6 space-y-5 text-white">
+          <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              <h3 className="text-lg font-bold">Booking Request Confirmed!</h3>
+            </div>
+            <button onClick={handleClose} className="p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 space-y-3">
+            <span className="text-[10px] text-slate-400 uppercase font-mono tracking-wider">BOOKED CODE / PASS ID</span>
+            <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <span className="font-mono text-lg font-extrabold text-emerald-400 tracking-wider">{bookingCode}</span>
+              <button 
+                onClick={copyCode}
+                className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{isCopied ? 'Copied!' : 'Copy Code'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-2xl mx-auto w-44 h-44 flex items-center justify-center shadow-xl">
+            <QrCode className="w-36 h-36 text-black" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-xs bg-slate-900 p-3.5 rounded-2xl border border-slate-800">
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Restaurant</span>
+              <span className="font-bold text-white block truncate">{activeRestaurant.name}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Date & Time</span>
+              <span className="font-bold text-emerald-400 block">{date} • {time}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Party Size</span>
+              <span className="font-bold text-white block">{partySize} Guests</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase block font-semibold">Allocated Table</span>
+              <span className="font-bold text-white block truncate">{confirmedBooking.tableName || 'Table Auto-Match'}</span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+            <Clock className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>Booking submitted! Awaiting host stand approval. Present this QR pass upon arrival.</span>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                handleClose();
+                setMyBookingsOpen(true);
+              }}
+              className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer transition-all"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>View in My Bookings</span>
+            </button>
+            <button
+              onClick={handleClose}
+              className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-xs border border-slate-800 cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-2xl animate-in fade-in">
