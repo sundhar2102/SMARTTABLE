@@ -77,6 +77,11 @@ jobs:
           BCRYPT_ROUNDS=10
           EOF
 
+      - name: Seed Database
+        run: |
+          cd backend
+          npm run seed
+
       - name: Start Backend Server in Background
         run: |
           cd backend
