@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   Store, 
@@ -62,7 +62,8 @@ export const AdminDashboard = () => {
     restaurantApplications,
     acceptReservation,
     declineReservation,
-    updateTableBill
+    updateTableBill,
+    processingTables
   } = useApp();
 
   const pendingApplicationsCount = restaurantApplications ? restaurantApplications.filter(a => a.status === 'pending').length : 0;
@@ -71,6 +72,33 @@ export const AdminDashboard = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(true);
+
+  // Dynamic live countdown clock for tables
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 5000); // refresh UI clock every 5 seconds
+    return () => clearInterval(timer);
+  }, []);
+
+  const getDisplayMinsRemaining = (table) => {
+    if (table.status === 'occupied') {
+      if (table.expectedAvailableAt) {
+        const diffMs = new Date(table.expectedAvailableAt).getTime() - currentTime;
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 25;
+    }
+    if (table.status === 'cleaning') {
+      if (table.cleaningStartedAt) {
+        const diffMs = (new Date(table.cleaningStartedAt).getTime() + 5 * 60000) - currentTime;
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 5;
+    }
+    return null;
+  };
 
   // Table Bill Management State
   const [selectedBillTableId, setSelectedBillTableId] = useState('ODR1');
@@ -109,7 +137,7 @@ export const AdminDashboard = () => {
   const occupiedTables = currentRest?.occupied_tables ?? (currentRest?.tables ? currentRest.tables.filter(t => t.status === 'occupied').length : 0);
   const reservedTables = currentRest?.reserved_tables ?? (currentRest?.tables ? currentRest.tables.filter(t => t.status === 'reserved').length : 0);
   const cleaningTables = currentRest?.cleaning_tables ?? (currentRest?.tables ? currentRest.tables.filter(t => t.status === 'cleaning').length : 0);
-  const occupancyRatio = currentRest?.occupancy_percentage ?? (totalTables > 0 ? Math.round(((totalTables - freeTables) / totalTables) * 100) : 0);
+  const occupancyRatio = currentRest?.occupancy_percentage ?? (totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0);
 
   // Auto-calculated Estimated Wait Time for Next Free Table (Powered by Backend Metrics)
   const calculatedWaitMinutes = currentRest?.estimated_wait_minutes !== undefined 
@@ -735,51 +763,73 @@ export const AdminDashboard = () => {
                   <div className="text-xs text-gray-300">
                     <div>Capacity: <strong>{table.capacity} Guests</strong></div>
                     <div className="text-[10px] text-gray-400">{table.section}</div>
-                    {isOccupied && table.minsRemaining && (
+                    {isOccupied && (
                       <div className="text-[11px] text-amber-300 font-bold mt-1">
-                        ⏱️ ~{table.minsRemaining} mins remaining
+                        ⏱️ ~{getDisplayMinsRemaining(table)} mins remaining
+                      </div>
+                    )}
+                    {table.status === 'cleaning' && (
+                      <div className="text-[11px] text-indigo-300 font-bold mt-1">
+                        🧹 Cleaning (~{getDisplayMinsRemaining(table)} mins left)
                       </div>
                     )}
                   </div>
 
                   {/* 1-Click Status Toggles */}
-                  <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-gray-800/80">
-                    <button
-                      onClick={() => updateTableStatus(currentRest.id, table.id, 'available')}
-                      className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
-                        isAvailable ? 'bg-black text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Free 🟢
-                    </button>
+                  {(() => {
+                    const isTableProcessing = processingTables?.has(`${currentRest.id}-${table.id}`);
+                    return (
+                      <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-gray-800/80">
+                        <button
+                          onClick={() => updateTableStatus(currentRest.id, table.id, 'available')}
+                          disabled={isTableProcessing}
+                          className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
+                            isTableProcessing ? 'pointer-events-none opacity-50' : ''
+                          } ${
+                            isAvailable ? 'bg-black text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Free 🟢
+                        </button>
 
-                    <button
-                      onClick={() => updateTableStatus(currentRest.id, table.id, 'occupied')}
-                      className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
-                        isOccupied ? 'bg-rose-600 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Occupied 🔴
-                    </button>
+                        <button
+                          onClick={() => updateTableStatus(currentRest.id, table.id, 'occupied')}
+                          disabled={isTableProcessing}
+                          className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
+                            isTableProcessing ? 'pointer-events-none opacity-50' : ''
+                          } ${
+                            isOccupied ? 'bg-rose-600 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Occupied 🔴
+                        </button>
 
-                    <button
-                      onClick={() => updateTableStatus(currentRest.id, table.id, 'reserved')}
-                      className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
-                        isReserved ? 'bg-gray-400 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Booked 🟡
-                    </button>
+                        <button
+                          onClick={() => updateTableStatus(currentRest.id, table.id, 'reserved')}
+                          disabled={isTableProcessing}
+                          className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
+                            isTableProcessing ? 'pointer-events-none opacity-50' : ''
+                          } ${
+                            isReserved ? 'bg-gray-400 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Booked 🟡
+                        </button>
 
-                    <button
-                      onClick={() => updateTableStatus(currentRest.id, table.id, 'cleaning')}
-                      className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
-                        isCleaning ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      Sanitize 🧹
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => updateTableStatus(currentRest.id, table.id, 'cleaning')}
+                          disabled={isTableProcessing}
+                          className={`py-1.5 rounded-xl text-[10px] font-extrabold cursor-pointer transition-all ${
+                            isTableProcessing ? 'pointer-events-none opacity-50' : ''
+                          } ${
+                            isCleaning ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-900 text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          Sanitize 🧹
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

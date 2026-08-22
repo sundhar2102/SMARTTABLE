@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS `tables` (
     `x_pos`            DECIMAL(10, 2),
     `y_pos`            DECIMAL(10, 2),
     `reservation_name` VARCHAR(255),
+    `occupied_at`      TIMESTAMP NULL DEFAULT NULL,
+    `expected_available_at` TIMESTAMP NULL DEFAULT NULL,
+    `cleaning_started_at` TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (`id`, `restaurant_id`),
     FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`id`) ON DELETE CASCADE,
     INDEX `idx_tables_restaurant` (`restaurant_id`)

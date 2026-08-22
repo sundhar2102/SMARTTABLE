@@ -5,6 +5,7 @@ import reservationRoutes from './reservationRoutes.js';
 import orderRoutes from './orderRoutes.js';
 import aiRoutes from './aiRoutes.js';
 import authRoutes from './authRoutes.js';
+import adminRoutes from './adminRoutes.js';
 import { getDbStatus } from '../../database/db.js';
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.use('/reservations', reservationRoutes);
 router.use('/orders', orderRoutes);
 router.use('/ai', aiRoutes);
 router.use('/auth', authRoutes);
+router.use('/admin', adminRoutes);
 
 // Mock Payment Gateway Endpoint
 router.post('/payments/checkout', (req, res) => {
@@ -35,8 +37,8 @@ router.post('/payments/checkout', (req, res) => {
 });
 
 // Health check endpoint
-router.get('/health', (req, res) => {
-  const dbStatus = getDbStatus();
+router.get('/health', async (req, res) => {
+  const dbStatus = await getDbStatus();
   res.json({
     status: 'online',
     service: 'SmartTable AI REST API Backend',

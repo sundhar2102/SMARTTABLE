@@ -1,20 +1,18 @@
-import { queryAll } from '../../database/db.js';
+import { queryAll, queryRun } from '../../database/db.js';
 
 /**
  * Calculates data-driven SMARTTABLE wait-time and occupancy metrics.
- * @param {string} restaurantId - The restaurant to calculate metrics for.
+ * @param {Array} tables - The list of tables.
+ * @param {Array} activeOrders - Active dine-in orders workload.
  * @param {number} partySize - The size of the party requesting a wait time estimate (default 2).
  * @returns {object} Object containing metrics.
  */
 export const calculateWaitMetrics = (tables, activeOrders, partySize = 2) => {
-  // 1. Table Availability & Occupancy
   const totalTables = tables.length;
   let availableTables = 0;
   let occupiedTables = 0;
   let reservedTables = 0;
   let cleaningTables = 0;
-
-  const suitableReleaseTimes = [];
 
   for (const t of tables) {
     if (t.status === 'available') {
@@ -26,103 +24,147 @@ export const calculateWaitMetrics = (tables, activeOrders, partySize = 2) => {
     } else if (t.status === 'cleaning') {
       cleaningTables++;
     }
-
-    // Only consider tables that can accommodate the party size
-    if (t.capacity >= partySize) {
-      if (t.status === 'available') {
-        suitableReleaseTimes.push(0); // Available immediately
-      } else if (t.status === 'occupied' || t.status === 'cleaning') {
-        // Use mins_remaining if available
-        let estimatedRelease = t.mins_remaining;
-        
-        // If mins_remaining is NULL, do not invent a value randomly, but we need a fallback for the algorithm
-        // We will check active orders associated with this table
-        if (estimatedRelease === null || estimatedRelease === undefined) {
-          const tableOrders = activeOrders.filter(o => o.table_id === t.id);
-          if (t.status === 'cleaning') {
-            estimatedRelease = 5; // Standard cleaning buffer
-          } else if (tableOrders.length > 0) {
-            // They have active orders
-            // If they are just "Accepted", food will take ~15 mins, plus 20 mins to eat.
-            // If "Preparing", food is closer, maybe 25 mins total.
-            // Let's use a flat 30 mins from the time of the oldest order as a generic fallback.
-            const oldestOrder = tableOrders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
-            const createdDate = new Date(oldestOrder.created_at);
-            
-            // Defensive check against NaN dates or invalid formats
-            if (isNaN(createdDate.getTime())) {
-              estimatedRelease = 30; // Safe default if date is invalid
-            } else {
-              const elapsed = Math.floor((new Date() - createdDate) / 60000);
-              
-              // Handle potential NaN from Math.floor if elapsed logic fails for any reason
-              if (isNaN(elapsed)) {
-                estimatedRelease = 30;
-              } else {
-                estimatedRelease = Math.max(5, 45 - elapsed); // Assume 45 mins turnover
-              }
-            }
-          } else {
-            // Occupied but no active order (maybe just seated, or already paid)
-            estimatedRelease = 15;
-          }
-        }
-        
-        // Final sanity check before pushing to suitableReleaseTimes
-        if (estimatedRelease === null || estimatedRelease === undefined || isNaN(estimatedRelease)) {
-          estimatedRelease = 15; // Hard generic fallback
-        }
-        
-        suitableReleaseTimes.push(estimatedRelease);
-      }
-    }
   }
 
-  // Calculate Occupancy Percentage
   const occupancyPercentage = totalTables > 0 
     ? Math.round((occupiedTables / totalTables) * 100) 
     : 0;
 
-  // 5. Waiting Queue
-  // Queue count = Active orders for dine-in where table_id is null/empty
+  // Filter tables matching the party capacity
+  const suitableTables = tables.filter(t => t.capacity >= partySize);
+
+  // Filter active dine-in orders that do not have a table_id assigned (queue)
   const queueOrders = activeOrders.filter(o => !o.table_id || o.table_id.trim() === '');
   const queueCount = queueOrders.length;
 
-  // 6. Wait-Time Algorithm
-  let estimatedWaitMinutes = 0;
-  
-  if (suitableReleaseTimes.length === 0) {
-    // No tables can accommodate this party size
-    estimatedWaitMinutes = -1; // Represents "No suitable table"
-  } else {
-    // Sort ascending
-    suitableReleaseTimes.sort((a, b) => a - b);
-    
-    // If we have an available table
-    if (suitableReleaseTimes[0] === 0) {
-      estimatedWaitMinutes = 0;
-    } else {
-      // The current party is conceptually at index (queueCount) in the line for a suitable table.
-      // If queue is 0, they get the first table to release: suitableReleaseTimes[0].
-      // If queue is 1, they get the second table: suitableReleaseTimes[1].
-      
-      const targetIndex = queueCount;
-      if (targetIndex < suitableReleaseTimes.length) {
-        estimatedWaitMinutes = suitableReleaseTimes[targetIndex];
-      } else {
-        // If the queue is longer than the number of suitable tables, wrap around.
-        // Assume every table turnover takes 45 minutes on average after the first release.
-        const wrapCount = Math.floor(targetIndex / suitableReleaseTimes.length);
-        const remainder = targetIndex % suitableReleaseTimes.length;
-        estimatedWaitMinutes = suitableReleaseTimes[remainder] + (wrapCount * 45);
+  if (suitableTables.length === 0) {
+    // Rule E: No Suitable Capacity
+    return {
+      total_tables: totalTables,
+      available_tables: availableTables,
+      occupied_tables: occupiedTables,
+      reserved_tables: reservedTables,
+      cleaning_tables: cleaningTables,
+      occupancy_percentage: occupancyPercentage,
+      estimated_wait_minutes: -1,
+      availability: "unavailable",
+      reason: "NO_SUITABLE_TABLE",
+      queue_count: queueCount,
+      suitableTableId: null,
+      confidence: "low",
+      factors: {
+        queuePosition: queueCount,
+        tablesOccupied: occupiedTables,
+        nextTableAvailableIn: -1,
+        cleaningBuffer: 5
       }
+    };
+  }
+
+  // Calculate release time for each suitable table
+  const tableReleaseTimes = suitableTables.map(t => {
+    let releaseTime = 0;
+    let confidenceScore = 'high';
+
+    if (t.status === 'available') {
+      releaseTime = 0;
+    } else if (t.status === 'cleaning') {
+      // Rule C: Cleaning tables
+      if (t.cleaning_started_at) {
+        const diffMs = (new Date(t.cleaning_started_at).getTime() + 5 * 60000) - Date.now();
+        releaseTime = Math.max(0, Math.ceil(diffMs / 60000));
+      } else if (t.mins_remaining !== null && t.mins_remaining !== undefined) {
+        releaseTime = t.mins_remaining;
+      } else {
+        releaseTime = 5; // default cleaning buffer
+      }
+    } else if (t.status === 'reserved') {
+      // Rule D: Reserved tables
+      if (t.mins_remaining !== null && t.mins_remaining !== undefined) {
+        releaseTime = t.mins_remaining;
+      } else {
+        releaseTime = 15; // default reserved buffer
+      }
+    } else if (t.status === 'occupied') {
+      // Rule B: Occupied tables
+      if (t.expected_available_at) {
+        const diffMs = new Date(t.expected_available_at).getTime() - Date.now();
+        releaseTime = Math.max(0, Math.ceil(diffMs / 60000));
+      } else if (t.mins_remaining !== null && t.mins_remaining !== undefined) {
+        releaseTime = t.mins_remaining;
+      } else {
+        const tableOrders = activeOrders.filter(o => o.table_id === t.id);
+        if (tableOrders.length > 0) {
+          const latestOrder = tableOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+          const createdAt = new Date(latestOrder.created_at);
+          const elapsedMins = !isNaN(createdAt.getTime()) ? Math.floor((Date.now() - createdAt) / 60000) : 0;
+          
+          const prepTime = 15;
+          const diningTime = 30;
+          const cleaningTime = 5;
+          const totalDuration = prepTime + diningTime + cleaningTime;
+
+          if (latestOrder.order_status === 'Pending Acceptance' || latestOrder.order_status === 'Received') {
+            releaseTime = Math.max(cleaningTime, totalDuration - elapsedMins);
+          } else if (latestOrder.order_status === 'Preparing' || latestOrder.order_status === 'Cooking') {
+            releaseTime = Math.max(cleaningTime, (prepTime - elapsedMins) + diningTime + cleaningTime);
+          } else if (latestOrder.order_status === 'Ready' || latestOrder.order_status === 'Served') {
+            const elapsedSinceServed = Math.max(0, elapsedMins - prepTime);
+            releaseTime = Math.max(cleaningTime, (diningTime - elapsedSinceServed) + cleaningTime);
+          } else {
+            releaseTime = cleaningTime;
+          }
+        } else {
+          releaseTime = 25; // default occupied buffer when no active order
+          confidenceScore = 'medium';
+        }
+      }
+    }
+
+    return {
+      tableId: t.id,
+      releaseTime: Math.max(0, releaseTime),
+      confidence: confidenceScore
+    };
+  });
+
+  // Sort by release time ascending
+  tableReleaseTimes.sort((a, b) => a.releaseTime - b.releaseTime);
+
+  let estimatedWait = 0;
+  let targetTable = null;
+  let finalConfidence = 'high';
+  let availability = "waiting";
+
+  // Rule A: Suitable available table exists and no queue
+  if (tableReleaseTimes[0].releaseTime === 0 && queueCount === 0) {
+    estimatedWait = 0;
+    targetTable = tableReleaseTimes[0].tableId;
+    finalConfidence = tableReleaseTimes[0].confidence;
+    availability = "instant";
+  } else {
+    // If there is a queue or no suitable table is available immediately
+    const targetIndex = queueCount;
+    if (targetIndex < tableReleaseTimes.length) {
+      estimatedWait = tableReleaseTimes[targetIndex].releaseTime;
+      targetTable = tableReleaseTimes[targetIndex].tableId;
+      finalConfidence = tableReleaseTimes[targetIndex].confidence;
+    } else {
+      const wrapCount = Math.floor(targetIndex / tableReleaseTimes.length);
+      const remainder = targetIndex % tableReleaseTimes.length;
+      const baseRelease = tableReleaseTimes[remainder].releaseTime;
+      estimatedWait = baseRelease + (wrapCount * 45);
+      targetTable = tableReleaseTimes[remainder].tableId;
+      finalConfidence = 'medium';
+    }
+
+    if (estimatedWait === 0) {
+      // If estimated wait ended up being 0 (e.g. queue count < number of available tables)
+      availability = "instant";
     }
   }
 
-  // Final defensive check for return value
-  if (estimatedWaitMinutes === null || estimatedWaitMinutes === undefined || isNaN(estimatedWaitMinutes)) {
-    estimatedWaitMinutes = 15; // generic fallback
-  }
+  const nextAvailable = tableReleaseTimes[0].releaseTime;
 
   return {
     total_tables: totalTables,
@@ -131,22 +173,43 @@ export const calculateWaitMetrics = (tables, activeOrders, partySize = 2) => {
     reserved_tables: reservedTables,
     cleaning_tables: cleaningTables,
     occupancy_percentage: occupancyPercentage,
-    estimated_wait_minutes: estimatedWaitMinutes,
-    queue_count: queueCount
+    estimated_wait_minutes: Math.round(estimatedWait),
+    availability,
+    queue_count: queueCount,
+    suitableTableId: targetTable,
+    confidence: finalConfidence,
+    factors: {
+      queuePosition: queueCount,
+      tablesOccupied: occupiedTables,
+      nextTableAvailableIn: Math.round(nextAvailable),
+      cleaningBuffer: 5
+    }
   };
 };
 
 export const calculateRestaurantMetrics = async (restaurantId, partySize = 2) => {
+  // 0. Auto-reconcile cleaning tables in MySQL
+  try {
+    await queryRun(`
+      UPDATE \`tables\` 
+      SET status = 'available', occupied_at = NULL, expected_available_at = NULL, cleaning_started_at = NULL, mins_remaining = NULL 
+      WHERE status = 'cleaning' 
+        AND cleaning_started_at IS NOT NULL 
+        AND cleaning_started_at <= SUBDATE(NOW(), INTERVAL 5 MINUTE)
+    `);
+  } catch (e) {
+    console.error('[Reconciliation Error]:', e.message);
+  }
+
   // 1. Fetch Tables
   const tables = await queryAll('SELECT * FROM `tables` WHERE restaurant_id = ?', [restaurantId]);
   
-  // 2. Fetch Active Orders
-  // We exclude Completed, Rejected, Cancelled to get only active workload.
+  // 2. Fetch Active Orders (including Served)
   const activeOrders = await queryAll(`
     SELECT * FROM orders 
     WHERE restaurant_id = ? 
       AND status NOT IN ('Completed', 'Rejected', 'Cancelled')
-      AND order_status NOT IN ('Completed', 'Rejected', 'Cancelled', 'Served')
+      AND order_status NOT IN ('Completed', 'Rejected', 'Cancelled')
       AND fulfillment_type = 'dine-in'
   `, [restaurantId]);
 

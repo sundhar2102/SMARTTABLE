@@ -49,6 +49,17 @@ export const login = async (req, res) => {
       }
     }
 
+    // Phase 6: Block login for suspended or rejected accounts
+    if (user.status === 'suspended' || user.status === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_SUSPENDED',
+        message: user.status === 'suspended'
+          ? 'Your account has been suspended. Please contact support.'
+          : 'Your account registration was rejected. Please contact support.'
+      });
+    }
+
     const token = jwt.sign(
       { id: user.id, role: user.role, restaurantId: user.restaurant_id || null },
       JWT_SECRET,
@@ -175,10 +186,9 @@ export const verifyOTP = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid OTP code' });
     }
 
-    // Check expiry. In SQLite, datetime('now') returns UTC. Let's compare with js Date or DB.
-    // Easiest is asking the DB if it's expired
+    // Check expiry. In MySQL, NOW() returns the current timestamp.
     const expiredCheck = await queryGet(
-      'SELECT CASE WHEN datetime("now") > ? THEN 1 ELSE 0 END as isExpired',
+      'SELECT CASE WHEN NOW() > ? THEN 1 ELSE 0 END as isExpired',
       [user.otp_expires_at]
     );
 

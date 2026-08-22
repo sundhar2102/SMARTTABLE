@@ -45,22 +45,11 @@ export const AppProvider = ({ children }) => {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   
   // Platform Users & Owners Management State (Admin console)
-  const [registeredUsers, setRegisteredUsers] = useState(() => {
-    try {
-      const saved = localStorage.getItem('smarttable_registered_users');
-      return saved ? JSON.parse(saved) : INITIAL_USERS;
-    } catch {
-      return INITIAL_USERS;
-    }
-  });
-  const [restaurantOwners, setRestaurantOwners] = useState(() => {
-    try {
-      const saved = localStorage.getItem('smarttable_restaurant_owners');
-      return saved ? JSON.parse(saved) : INITIAL_OWNERS;
-    } catch {
-      return INITIAL_OWNERS;
-    }
-  });
+  // Phase 6: No longer seeded from localStorage — loaded from MySQL via API on demand
+  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [restaurantOwners, setRestaurantOwners] = useState([]);
+  const [adminRestaurants, setAdminRestaurants] = useState([]);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [disputes, setDisputes] = useState(INITIAL_DISPUTES);
 
   // Restaurant Partner Applications & Approvals State
@@ -92,6 +81,9 @@ export const AppProvider = ({ children }) => {
   const [userReservations, setUserReservations] = useState([]);
   const [preOrderItems, setPreOrderItems] = useState([]);
   const [preOrderRestaurantId, setPreOrderRestaurantId] = useState(null);
+
+  // Table update concurrency lock
+  const [processingTables, setProcessingTables] = useState(new Set());
 
   // Notification Toast
   const [toast, setToast] = useState({
@@ -257,7 +249,14 @@ export const AppProvider = ({ children }) => {
         if (rest.id === data.restaurantId) {
           return {
             ...rest,
-            tables: rest.tables.map(table => table.id === data.tableId ? { ...table, status: data.status, minsRemaining: data.minsRemaining } : table)
+            tables: rest.tables.map(table => table.id === data.tableId ? {
+              ...table,
+              status: data.status,
+              minsRemaining: data.minsRemaining,
+              occupiedAt: data.occupiedAt,
+              expectedAvailableAt: data.expectedAvailableAt,
+              cleaningStartedAt: data.cleaningStartedAt
+            } : table)
           };
         }
         return rest;
@@ -341,71 +340,49 @@ export const AppProvider = ({ children }) => {
   // Dynamic Algorithmic Wait Time Calculator (Now powered by Backend metrics)
   const getEstimatedWaitTime = (restaurantId, partySize = 2) => {
     const rest = restaurants.find(r => r.id === restaurantId) || activeRestaurant;
-    if (!rest || !rest.tables) return { waitMins: 0, queueLength: 0, status: 'Instant Seating', color: 'emerald', freeMatchingTables: 0 };
+    if (!rest) return { waitMins: 0, queueLength: 0, status: 'Loading wait times...', color: 'slate', freeMatchingTables: 0 };
 
-    // If the backend has provided metrics, use them
-    if (rest.estimated_wait_minutes !== undefined && rest.estimated_wait_minutes !== null && !isNaN(rest.estimated_wait_minutes)) {
-      const waitMins = Number(rest.estimated_wait_minutes);
-      
-      // -1 indicates no suitable table available for this party size
-      if (waitMins === -1) {
-        return {
-          waitMins: -1,
-          queueLength: rest.queue_count || 0,
-          status: 'No Suitable Table Available',
-          color: 'rose',
-          freeMatchingTables: 0
-        };
-      }
+    const waitMins = rest.estimated_wait_minutes !== undefined && rest.estimated_wait_minutes !== null ? Number(rest.estimated_wait_minutes) : 0;
+    const queueLength = rest.queue_count || 0;
+    const freeMatchingTables = rest.tables ? rest.tables.filter(t => t.status === 'available' && t.capacity >= partySize).length : (rest.available_tables || 0);
 
-      if (waitMins === 0) {
-        return {
-          waitMins: 0,
-          queueLength: 0,
-          status: 'Instant Seating Available (0 min)',
-          color: 'emerald',
-          freeMatchingTables: rest.available_tables || 0
-        };
-      }
-
+    const hasCapacity = rest.tables ? rest.tables.some(t => t.capacity >= partySize) : true;
+    if (waitMins === -1 || !hasCapacity) {
       return {
-        waitMins,
-        queueLength: rest.queue_count || 0,
-        status: `~${waitMins} mins estimated wait`,
-        color: waitMins > 20 ? 'rose' : 'amber',
+        waitMins: -1,
+        queueLength,
+        status: 'No Suitable Tables',
+        color: 'rose',
         freeMatchingTables: 0
       };
     }
 
-    // Fallback if backend metrics are not yet loaded
-    const totalTables = rest.tables.length;
-    const freeTables = rest.tables.filter(t => t.status === 'available' && t.capacity >= partySize).length;
-    const allFreeTables = rest.tables.filter(t => t.status === 'available').length;
-
-    if (freeTables > 0) {
+    if (waitMins === 0 && freeMatchingTables > 0) {
       return {
         waitMins: 0,
         queueLength: 0,
-        status: 'Instant Seating Available (0 min)',
+        status: '0 min (Instant)',
         color: 'emerald',
-        freeMatchingTables: freeTables
+        freeMatchingTables
       };
     }
 
-    let baseWait = 10;
-    if (rest.crowdLevel === 'medium') baseWait = 15;
-    if (rest.crowdLevel === 'high') baseWait = 30;
-
-    if (partySize > 4) baseWait += 15;
-    else if (partySize > 2) baseWait += 8;
-
-    const estimatedQueue = Math.max(1, Math.round((totalTables - allFreeTables) / 2));
+    const actualWait = waitMins > 0 ? waitMins : (freeMatchingTables > 0 ? 0 : 15);
+    if (actualWait === 0) {
+      return {
+        waitMins: 0,
+        queueLength: 0,
+        status: '0 min (Instant)',
+        color: 'emerald',
+        freeMatchingTables
+      };
+    }
 
     return {
-      waitMins: baseWait,
-      queueLength: estimatedQueue,
-      status: `~${baseWait}-${baseWait + 10} mins estimated wait`,
-      color: rest.crowdLevel === 'high' ? 'rose' : 'amber',
+      waitMins: actualWait,
+      queueLength,
+      status: `~${actualWait} mins`,
+      color: actualWait > 20 ? 'rose' : 'amber',
       freeMatchingTables: 0
     };
   };
@@ -640,37 +617,101 @@ export const AppProvider = ({ children }) => {
   };
 
   // Update Table Status (available, occupied, reserved, cleaning)
-  const updateTableStatus = async (restaurantId, tableId, newStatus) => {
-    setRestaurants(prev => prev.map(rest => {
-      if (rest.id === restaurantId) {
-        const updatedTables = rest.tables.map(table => {
-          if (table.id === tableId) {
-            return { ...table, status: newStatus };
-          }
-          return table;
-        });
+  const updateTableStatus = async (restaurantId, tableId, newStatus, minsRemaining = null, reservationName = null) => {
+    const tableKey = `${restaurantId}-${tableId}`;
+    if (processingTables.has(tableKey)) {
+      return; // Block duplicate clicks
+    }
 
-        const occupiedCount = updatedTables.filter(t => t.status === 'occupied' || t.status === 'reserved').length;
-        const total = updatedTables.length;
-        const occRatio = total > 0 ? occupiedCount / total : 0;
-        const crowdLevel = occRatio > 0.75 ? 'high' : occRatio > 0.35 ? 'medium' : 'low';
-        const waitEstimate = occRatio > 0.75 ? '25-40 min' : occRatio > 0.35 ? '10-20 min' : '0 min (Instant Seating)';
+    setProcessingTables(prev => {
+      const next = new Set(prev);
+      next.add(tableKey);
+      return next;
+    });
 
-        return {
-          ...rest,
-          tables: updatedTables,
-          crowdLevel,
-          waitEstimate
-        };
-      }
-      return rest;
-    }));
+    let originalRestaurants = null;
+
+    setRestaurants(prev => {
+      originalRestaurants = prev;
+      return prev.map(rest => {
+        if (rest.id === restaurantId) {
+          const updatedTables = rest.tables.map(table => {
+            if (table.id === tableId) {
+              return { 
+                ...table, 
+                status: newStatus,
+                minsRemaining: newStatus === 'available' ? null : (minsRemaining !== null ? minsRemaining : table.minsRemaining),
+                reservationName: newStatus === 'available' ? null : (reservationName !== null ? reservationName : table.reservationName)
+              };
+            }
+            return table;
+          });
+
+          // Optimistic layout-based counts
+          const freeTables = updatedTables.filter(t => t.status === 'available').length;
+          const occupiedTables = updatedTables.filter(t => t.status === 'occupied').length;
+          const totalTables = updatedTables.length;
+          const occRatio = totalTables > 0 ? occupiedTables / totalTables : 0;
+          const occupancy_percentage = Math.round(occRatio * 100);
+
+          return {
+            ...rest,
+            tables: updatedTables,
+            available_tables: freeTables,
+            occupied_tables: occupiedTables,
+            occupancy_percentage
+          };
+        }
+        return rest;
+      });
+    });
 
     try {
-      await apiService.updateTableStatus(restaurantId, tableId, newStatus);
-    } catch (e) {}
-
-    triggerToast('Table Status Updated', `Table ${tableId} is now ${newStatus.toUpperCase()}.`, 'info');
+      const res = await apiService.updateTableStatus(restaurantId, tableId, newStatus, minsRemaining, reservationName);
+      if (res && res.success) {
+        const { updatedTable, metrics } = res.data;
+        setRestaurants(prev => prev.map(rest => {
+          if (rest.id === restaurantId) {
+            return {
+              ...rest,
+              total_tables: metrics.total_tables,
+              available_tables: metrics.available_tables,
+              occupied_tables: metrics.occupied_tables,
+              reserved_tables: metrics.reserved_tables,
+              cleaning_tables: metrics.cleaning_tables,
+              occupancy_percentage: metrics.occupancy_percentage,
+              estimated_wait_minutes: metrics.estimated_wait_minutes,
+              queue_count: metrics.queue_count,
+              tables: rest.tables.map(t => t.id === updatedTable.id ? {
+                ...t,
+                status: updatedTable.status,
+                minsRemaining: updatedTable.minsRemaining,
+                reservationName: updatedTable.reservationName,
+                occupiedAt: updatedTable.occupiedAt,
+                expectedAvailableAt: updatedTable.expectedAvailableAt,
+                cleaningStartedAt: updatedTable.cleaningStartedAt
+              } : t)
+            };
+          }
+          return rest;
+        }));
+        triggerToast('Table Status Updated', `Table ${tableId} is now ${newStatus.toUpperCase()}.`, 'info');
+      } else {
+        throw new Error(res?.message || 'Failed to update table status.');
+      }
+    } catch (err) {
+      console.error('[Seating Ops] Update status error:', err.message);
+      if (originalRestaurants) {
+        setRestaurants(originalRestaurants);
+      }
+      triggerToast('Status Update Failed', err.message || 'Seating server transaction failed.', 'alert');
+    } finally {
+      setProcessingTables(prev => {
+        const next = new Set(prev);
+        next.delete(tableKey);
+        return next;
+      });
+    }
   };
 
   // Update Restaurant Crowd Level
@@ -934,115 +975,98 @@ export const AppProvider = ({ children }) => {
     triggerToast('Logged Out', `Session ended for ${prevName || 'user'}. Returned to login screen.`, 'info');
   };
 
-  // User Management (Admin Dashboard)
-  const toggleUserStatus = (userId) => {
-    setRegisteredUsers(prev => {
-      const updated = prev.map(u => {
-        if (u.id === userId) {
-          const nextStatus = u.status === 'active' ? 'deactivated' : 'active';
-          triggerToast(
-            `User ${u.name} ${nextStatus === 'active' ? 'Activated' : 'Deactivated'}`,
-            `Account status has been updated to ${nextStatus}.`,
-            nextStatus === 'active' ? 'info' : 'alert'
-          );
-          return { ...u, status: nextStatus };
-        }
-        return u;
-      });
-      try {
-        localStorage.setItem('smarttable_registered_users', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-  };
+  // ── Phase 6 Admin Data Loaders (MySQL-backed) ─────────────────────────────
 
-  const deleteUser = (userId) => {
-    setRegisteredUsers(prev => {
-      const updated = prev.filter(u => u.id !== userId);
-      try {
-        localStorage.setItem('smarttable_registered_users', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    triggerToast('User Deleted', `User account ${userId} was permanently removed.`, 'info');
-  };
-
-  const addUser = (userData) => {
-    const emailLower = (userData.email || '').trim().toLowerCase();
-    const userLower = (userData.username || '').trim().toLowerCase();
-
-    // Check localStorage + state for duplicates
-    const currentUsers = (() => {
-      try {
-        const saved = localStorage.getItem('smarttable_registered_users');
-        return saved ? JSON.parse(saved) : registeredUsers;
-      } catch {
-        return registeredUsers;
-      }
-    })();
-
-    const exists = currentUsers.some(u => 
-      (u.email && u.email.toLowerCase() === emailLower) ||
-      (userLower && u.username && u.username.toLowerCase() === userLower) ||
-      (userLower && u.email && u.email.split('@')[0].toLowerCase() === userLower)
-    );
-
-    if (exists) {
-      return { success: false, error: 'An account with this email or username already exists. Please sign in instead.' };
-    }
-
-    const cleanUsername = userLower.includes('@') ? userLower.split('@')[0] : (userLower || emailLower.split('@')[0]);
-    const finalRole = userData.role || targetRole || 'customer';
-
-    const newUser = {
-      id: userData.id || `USR-${finalRole.toUpperCase().slice(0, 3)}-${Math.floor(100 + Math.random() * 900)}`,
-      name: userData.name.trim(),
-      username: cleanUsername,
-      email: userData.email.trim(),
-      password: (userData.password || 'password123').trim(),
-      phone: userData.phone || '+91 98400 00000',
-      role: finalRole,
-      status: 'active',
-      totalBookings: 0,
-      totalSpent: 0,
-      favoriteCuisine: userData.favoriteCuisine || userData.dietaryPreference || 'Multi-Cuisine',
-      city: userData.city || 'Chennai',
-      restaurantId: userData.restaurantId || null,
-      restaurantName: userData.restaurantName || null,
-      gstin: userData.gstin || null,
-      fssai: userData.fssai || null,
-      joinedDate: new Date().toISOString().split('T')[0],
-      lastActive: 'Just now',
-      loyaltyPoints: finalRole === 'customer' ? 100 : 0
-    };
-
-    const updated = [newUser, ...currentUsers];
-    setRegisteredUsers(updated);
+  const loadAdminUsers = async () => {
     try {
-      localStorage.setItem('smarttable_registered_users', JSON.stringify(updated));
-    } catch (e) {}
-
-    // If owner, also record in restaurantOwners list
-    if (finalRole === 'owner') {
-      const newOwner = {
-        id: `OWN-${Date.now().toString().slice(-4)}`,
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        restaurantId: newUser.restaurantId || (restaurants[0] ? restaurants[0].id : 'on-de-roof-chennai'),
-        restaurantName: newUser.restaurantName || (restaurants[0] ? restaurants[0].name : 'Partner Venue'),
-        status: 'active',
-        joinedDate: newUser.joinedDate,
-        tablesCount: userData.tablesCount || 10,
-        monthlyTurnover: '₹0',
-        plan: 'Business Pro'
-      };
-      setRestaurantOwners(prev => [newOwner, ...prev]);
+      setAdminLoading(true);
+      const res = await apiService.admin.getUsers();
+      if (res?.success) setRegisteredUsers(res.data);
+    } catch (e) {
+      console.error('[AppContext] loadAdminUsers error:', e.message);
+    } finally {
+      setAdminLoading(false);
     }
-
-    triggerToast('Account Created', `Account for ${userData.name} (${finalRole === 'owner' ? 'Owner' : 'Diner'}) registered successfully.`, 'info');
-    return { success: true, user: newUser };
   };
+
+  const loadAdminOwners = async () => {
+    try {
+      setAdminLoading(true);
+      const res = await apiService.admin.getOwners();
+      if (res?.success) setRestaurantOwners(res.data);
+    } catch (e) {
+      console.error('[AppContext] loadAdminOwners error:', e.message);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const loadAdminRestaurants = async () => {
+    try {
+      const res = await apiService.admin.getRestaurants();
+      if (res?.success) setAdminRestaurants(res.data);
+    } catch (e) {
+      console.error('[AppContext] loadAdminRestaurants error:', e.message);
+    }
+  };
+
+  // User Management (Admin Dashboard) — Phase 6: calls MySQL API
+  const toggleUserStatus = async (userId) => {
+    const target = registeredUsers.find(u => u.id === userId);
+    if (!target) return;
+    const nextStatus = (target.status === 'active') ? 'suspended' : 'active';
+    try {
+      const res = await apiService.admin.updateUserStatus(userId, nextStatus);
+      if (res?.success) {
+        setRegisteredUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
+        triggerToast(
+          `User ${target.name} ${nextStatus === 'active' ? 'Activated' : 'Suspended'}`,
+          `Account status updated to ${nextStatus}.`,
+          nextStatus === 'active' ? 'info' : 'alert'
+        );
+      } else {
+        triggerToast('Action Failed', res?.message || 'Could not update user status.', 'alert');
+      }
+    } catch (e) {
+      triggerToast('Error', e.message || 'Server error updating user status.', 'alert');
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    try {
+      const res = await apiService.admin.deleteUser(userId);
+      if (res?.success) {
+        setRegisteredUsers(prev => prev.filter(u => u.id !== userId));
+        triggerToast('User Deleted', `User account ${userId} permanently removed.`, 'info');
+      } else {
+        triggerToast('Action Failed', res?.message || 'Could not delete user.', 'alert');
+      }
+    } catch (e) {
+      triggerToast('Error', e.message || 'Server error deleting user.', 'alert');
+    }
+  };
+
+  // addUser: kept for backward-compat UI forms but now calls the real register API
+  const addUser = async (userData) => {
+    try {
+      const res = await apiService.register({
+        name:     userData.name,
+        email:    userData.email,
+        phone:    userData.phone,
+        password: userData.password || 'Password@123',
+        role:     userData.role || 'customer'
+      });
+      if (res?.success) {
+        await loadAdminUsers();
+        triggerToast('Account Created', `Account for ${userData.name} registered.`, 'info');
+        return { success: true };
+      }
+      return { success: false, error: res?.message || 'Registration failed.' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  };
+
 
   // Full User / Owner Registration (Registers and Logs in in one shot)
   const registerUser = async (userData, targetRole = 'customer') => {
@@ -1182,68 +1206,63 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Owner Management (Admin Dashboard)
-  const toggleOwnerStatus = (ownerId) => {
-    setRestaurantOwners(prev => {
-      const updated = prev.map(o => {
-        if (o.id === ownerId) {
-          const nextStatus = o.status === 'active' ? 'deactivated' : 'active';
-          triggerToast(
-            `Owner ${o.name} ${nextStatus === 'active' ? 'Activated' : 'Deactivated'}`,
-            `Partner status for ${o.restaurantName} set to ${nextStatus}.`,
-            nextStatus === 'active' ? 'info' : 'alert'
-          );
-          return { ...o, status: nextStatus };
-        }
-        return o;
+  // Owner Management (Admin Dashboard) — Phase 6: calls MySQL API
+  const toggleOwnerStatus = async (ownerId) => {
+    const target = restaurantOwners.find(o => o.id === ownerId);
+    if (!target) return;
+    const nextStatus = (target.status === 'active') ? 'suspended' : 'active';
+    try {
+      const res = await apiService.admin.updateOwnerStatus(ownerId, nextStatus);
+      if (res?.success) {
+        setRestaurantOwners(prev => prev.map(o => o.id === ownerId ? { ...o, status: nextStatus } : o));
+        triggerToast(
+          `Owner ${target.name} ${nextStatus === 'active' ? 'Activated' : 'Suspended'}`,
+          `Partner status updated to ${nextStatus}.`,
+          nextStatus === 'active' ? 'info' : 'alert'
+        );
+      } else {
+        triggerToast('Action Failed', res?.message || 'Could not update owner status.', 'alert');
+      }
+    } catch (e) {
+      triggerToast('Error', e.message || 'Server error updating owner status.', 'alert');
+    }
+  };
+
+  const deleteOwner = async (ownerId) => {
+    try {
+      const res = await apiService.admin.deleteUser(ownerId);
+      if (res?.success) {
+        setRestaurantOwners(prev => prev.filter(o => o.id !== ownerId));
+        triggerToast('Owner Removed', `Owner account ${ownerId} removed.`, 'info');
+      } else {
+        triggerToast('Action Failed', res?.message || 'Could not remove owner.', 'alert');
+      }
+    } catch (e) {
+      triggerToast('Error', e.message || 'Server error removing owner.', 'alert');
+    }
+  };
+
+  // addOwner: calls register API with role=owner
+  const addOwner = async (ownerData) => {
+    try {
+      const res = await apiService.register({
+        name:         ownerData.name,
+        email:        ownerData.email,
+        phone:        ownerData.phone,
+        password:     ownerData.password || 'Password@123',
+        role:         'owner',
+        restaurantId: ownerData.restaurantId || null,
+        restaurantName: ownerData.restaurantName || null
       });
-      try {
-        localStorage.setItem('smarttable_restaurant_owners', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-  };
-
-  const deleteOwner = (ownerId) => {
-    setRestaurantOwners(prev => {
-      const updated = prev.filter(o => o.id !== ownerId);
-      try {
-        localStorage.setItem('smarttable_restaurant_owners', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    triggerToast('Owner Removed', `Owner account ${ownerId} was removed from the registry.`, 'info');
-  };
-
-  const addOwner = (ownerData) => {
-    const newOwner = {
-      id: `OWN-${Math.floor(200 + Math.random() * 800)}`,
-      name: ownerData.name,
-      username: (ownerData.username || ownerData.email.split('@')[0]).toLowerCase(),
-      email: ownerData.email,
-      password: (ownerData.password || 'password123').trim(),
-      phone: ownerData.phone,
-      restaurantId: ownerData.restaurantId || (restaurants[0]?.id),
-      restaurantName: ownerData.restaurantName || (restaurants.find(r => r.id === ownerData.restaurantId)?.name || 'Partner Restaurant'),
-      location: ownerData.location || 'Chennai',
-      fssaiLicense: ownerData.fssaiLicense || `1242300${Math.floor(1000000 + Math.random() * 9000000)}`,
-      gstin: ownerData.gstin || '33AAAAA1234A1Z5',
-      status: 'active',
-      complianceScore: 95,
-      settlementUpiId: ownerData.settlementUpiId || 'sundhar8074@axl',
-      totalTablesManaged: Number(ownerData.totalTablesManaged || 6),
-      joinedDate: new Date().toISOString().split('T')[0],
-      monthlyPayout: 0
-    };
-    setRestaurantOwners(prev => {
-      const updated = [newOwner, ...prev];
-      try {
-        localStorage.setItem('smarttable_restaurant_owners', JSON.stringify(updated));
-      } catch (e) {}
-      return updated;
-    });
-    triggerToast('Owner Added', `Partner account for ${ownerData.name} (${newOwner.restaurantName}) registered.`, 'info');
-    return { success: true, owner: newOwner };
+      if (res?.success) {
+        await loadAdminOwners();
+        triggerToast('Owner Added', `Partner account for ${ownerData.name} registered.`, 'info');
+        return { success: true };
+      }
+      return { success: false, error: res?.message || 'Registration failed.' };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   };
 
   // Disputes Management (Admin Dashboard)
@@ -1556,6 +1575,13 @@ export const AppProvider = ({ children }) => {
     disputes,
     setDisputes,
     resolveDispute,
+
+    // Phase 6: MySQL-backed admin data loaders
+    adminLoading,
+    adminRestaurants,
+    loadAdminUsers,
+    loadAdminOwners,
+    loadAdminRestaurants,
     
     // Partner Restaurant Applications & Approvals
     restaurantApplications,
@@ -1621,7 +1647,8 @@ export const AppProvider = ({ children }) => {
     updateTableStatus,
     updateRestaurantCrowdLevel,
     updateReservationOrderStatus,
-    calculateAiPrediction
+    calculateAiPrediction,
+    processingTables
   };
 
   return (

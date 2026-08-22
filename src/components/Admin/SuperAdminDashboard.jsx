@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   Building2, 
@@ -31,7 +31,9 @@ import {
   Mail,
   Receipt,
   Clock,
-  X
+  X,
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { RestaurantApprovalsAdmin } from './RestaurantApprovalsAdmin';
 
@@ -51,7 +53,11 @@ export const SuperAdminDashboard = () => {
     restaurants,
     triggerToast,
     setSelectedRestaurantId,
-    setViewMode
+    setViewMode,
+    // Phase 6: MySQL-backed admin loaders
+    adminLoading,
+    loadAdminUsers,
+    loadAdminOwners
   } = useApp();
 
   const [activeAdminTab, setActiveAdminTab] = useState('analytics'); // 'analytics' | 'users' | 'owners' | 'approvals' | 'disputes'
@@ -73,6 +79,17 @@ export const SuperAdminDashboard = () => {
   const [newOwnerRestId, setNewOwnerRestId] = useState(restaurants[0]?.id || '');
   const [newOwnerFssai, setNewOwnerFssai] = useState('');
 
+  // Phase 6: Load from MySQL on mount and on tab switch
+  useEffect(() => {
+    loadAdminUsers();
+    loadAdminOwners();
+  }, []);
+
+  useEffect(() => {
+    if (activeAdminTab === 'users') loadAdminUsers();
+    if (activeAdminTab === 'owners') loadAdminOwners();
+  }, [activeAdminTab]);
+
   // Metrics
   const totalUsersCount = registeredUsers.length;
   const activeUsersCount = registeredUsers.filter(u => u.status === 'active').length;
@@ -83,6 +100,7 @@ export const SuperAdminDashboard = () => {
 
   const totalPlatformGmv = registeredUsers.reduce((sum, u) => sum + (u.totalSpent || 0), 0) + 482000;
   const platformCommissionRevenue = Math.round(totalPlatformGmv * 0.15);
+
 
   // Filtered Users
   const filteredUsers = registeredUsers.filter(u => {

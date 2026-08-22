@@ -93,7 +93,7 @@ export const apiService = {
       return await handleResponse(res);
     } catch (err) {
       console.warn('apiService.updateTableStatus error:', err.message);
-      return null;
+      throw err;
     }
   },
 
@@ -314,5 +314,58 @@ export const apiService = {
       console.warn('apiService.initiatePayment error:', err.message);
       return null;
     }
+  },
+
+  // 9. Super Admin — User & Platform Management (Phase 6)
+  admin: {
+    getStats: async () => {
+      const res = await fetch(`${API_BASE_URL}/admin/stats`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    getUsers: async (params = {}) => {
+      const qs = new URLSearchParams(params).toString();
+      const res = await fetch(`${API_BASE_URL}/admin/users${qs ? '?' + qs : ''}`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    updateUserStatus: async (userId, status) => {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+      return handleResponse(res);
+    },
+    deleteUser: async (userId) => {
+      const res = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      return handleResponse(res);
+    },
+    getOwners: async () => {
+      const res = await fetch(`${API_BASE_URL}/admin/owners`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    updateOwnerStatus: async (ownerId, status) => {
+      const res = await fetch(`${API_BASE_URL}/admin/owners/${ownerId}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status })
+      });
+      return handleResponse(res);
+    },
+    getRestaurants: async () => {
+      const res = await fetch(`${API_BASE_URL}/admin/restaurants`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    updateRestaurantStatus: async (restaurantId, isAcceptingOrders) => {
+      const res = await fetch(`${API_BASE_URL}/admin/restaurants/${restaurantId}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isAcceptingOrders })
+      });
+      return handleResponse(res);
+    }
   }
 };
+

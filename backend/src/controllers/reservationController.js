@@ -77,7 +77,11 @@ export const createReservation = async (req, res) => {
 
       if (targetTable.capacity < Number(partySize)) {
         await connection.rollback();
-        return res.status(400).json({ success: false, message: 'Table capacity is insufficient for the party size.' });
+        return res.status(409).json({
+          success: false,
+          code: 'NO_SUITABLE_CAPACITY',
+          message: 'No table can accommodate this party size.'
+        });
       }
 
       const hasReservationConflict = activeReservations.some(r => 
@@ -85,21 +89,47 @@ export const createReservation = async (req, res) => {
       );
       if (hasReservationConflict) {
         await connection.rollback();
-        return res.status(409).json({ success: false, message: 'No tables are available for the selected time slot.' });
+        return res.status(409).json({
+          success: false,
+          code: 'NO_TABLE_AVAILABLE',
+          message: 'No suitable table is available for the selected time and party size.'
+        });
       }
 
       if (isToday && (targetTable.status === 'occupied' || targetTable.status === 'cleaning')) {
+        // Use authoritative timestamp when available, fall back to mins_remaining
+        let minsUntilFree = 0;
+        if (targetTable.status === 'occupied' && targetTable.expected_available_at) {
+          minsUntilFree = Math.max(0, Math.ceil((new Date(targetTable.expected_available_at).getTime() - now.getTime()) / 60000));
+        } else if (targetTable.status === 'cleaning' && targetTable.cleaning_started_at) {
+          const cleanDone = new Date(targetTable.cleaning_started_at).getTime() + 5 * 60000;
+          minsUntilFree = Math.max(0, Math.ceil((cleanDone - now.getTime()) / 60000));
+        } else {
+          minsUntilFree = targetTable.mins_remaining || 0;
+        }
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const occupiedUntil = currentMinutes + (targetTable.mins_remaining || 0);
+        const occupiedUntil = currentMinutes + minsUntilFree;
         if (reqMinutes < occupiedUntil) {
           await connection.rollback();
-          return res.status(409).json({ success: false, message: 'No tables are available for the selected time slot.' });
+          return res.status(409).json({
+            success: false,
+            code: 'NO_TABLE_AVAILABLE',
+            message: 'No suitable table is available for the selected time and party size.'
+          });
         }
       }
 
       assignedTable = targetTable;
     } else {
       const eligibleTables = tables.filter(t => t.capacity >= Number(partySize));
+      if (eligibleTables.length === 0) {
+        await connection.rollback();
+        return res.status(409).json({
+          success: false,
+          code: 'NO_SUITABLE_CAPACITY',
+          message: 'No table can accommodate this party size.'
+        });
+      }
 
       const suitableTables = eligibleTables.filter(t => {
         const hasReservationConflict = activeReservations.some(r => 
@@ -108,8 +138,18 @@ export const createReservation = async (req, res) => {
         if (hasReservationConflict) return false;
 
         if (isToday && (t.status === 'occupied' || t.status === 'cleaning')) {
+          // Use authoritative timestamp when available, fall back to mins_remaining
+          let minsUntilFree = 0;
+          if (t.status === 'occupied' && t.expected_available_at) {
+            minsUntilFree = Math.max(0, Math.ceil((new Date(t.expected_available_at).getTime() - now.getTime()) / 60000));
+          } else if (t.status === 'cleaning' && t.cleaning_started_at) {
+            const cleanDone = new Date(t.cleaning_started_at).getTime() + 5 * 60000;
+            minsUntilFree = Math.max(0, Math.ceil((cleanDone - now.getTime()) / 60000));
+          } else {
+            minsUntilFree = t.mins_remaining || 0;
+          }
           const currentMinutes = now.getHours() * 60 + now.getMinutes();
-          const occupiedUntil = currentMinutes + (t.mins_remaining || 0);
+          const occupiedUntil = currentMinutes + minsUntilFree;
           if (reqMinutes < occupiedUntil) return false;
         }
 
@@ -118,7 +158,11 @@ export const createReservation = async (req, res) => {
 
       if (suitableTables.length === 0) {
         await connection.rollback();
-        return res.status(409).json({ success: false, message: 'No tables are available for the selected time slot.' });
+        return res.status(409).json({
+          success: false,
+          code: 'NO_TABLE_AVAILABLE',
+          message: 'No suitable table is available for the selected time and party size.'
+        });
       }
 
       suitableTables.sort((a, b) => a.capacity - b.capacity);

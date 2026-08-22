@@ -13,6 +13,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import apiRouter from './routes/api.js';
 import { initDb, queryGet } from '../database/db.js';
+import { reconcileCleaningTables } from './services/waitTimeService.js';
 import jwt from 'jsonwebtoken';
 
 const app = express();
@@ -155,4 +156,9 @@ httpServer.listen(PORT, async () => {
   await initDb();
   console.log(`🚀 SmartTable AI Backend running on http://localhost:${PORT}`);
   console.log(`📡 REST API & Socket.IO active on http://localhost:${PORT}`);
+  
+  // Clean up expired cleaning tables in background every 10 seconds
+  setInterval(() => {
+    reconcileCleaningTables(io);
+  }, 10000);
 });

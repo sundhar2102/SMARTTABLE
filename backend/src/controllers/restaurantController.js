@@ -3,6 +3,47 @@ import { calculateRestaurantMetrics } from '../utils/waitAlgorithm.js';
 import { fetchOsmRestaurants, isDuplicate } from '../services/osmService.js';
 import { calculateWaitTimeForParty } from '../services/waitTimeService.js';
 
+const formatWaitEstimate = (waitMins) => {
+  if (waitMins === -1) return 'No Suitable Tables';
+  if (waitMins === 0) return '0 min (Instant)';
+  return `~${waitMins} mins`;
+};
+
+const mapTableResponse = (t) => {
+  let minsRemaining = t.mins_remaining;
+  if (t.status === 'occupied') {
+    if (t.expected_available_at) {
+      const diffMs = new Date(t.expected_available_at).getTime() - Date.now();
+      minsRemaining = Math.max(0, Math.ceil(diffMs / 60000));
+    } else {
+      minsRemaining = 25; // default fallback
+    }
+  } else if (t.status === 'cleaning') {
+    if (t.cleaning_started_at) {
+      const diffMs = (new Date(t.cleaning_started_at).getTime() + 5 * 60000) - Date.now();
+      minsRemaining = Math.max(0, Math.ceil(diffMs / 60000));
+    } else {
+      minsRemaining = 5; // default fallback
+    }
+  } else if (t.status === 'reserved') {
+    minsRemaining = 15; // default fallback
+  }
+
+  return {
+    id: t.id,
+    name: t.name,
+    capacity: t.capacity,
+    section: t.section,
+    status: t.status,
+    minsRemaining: minsRemaining,
+    occupiedAt: t.occupied_at,
+    expectedAvailableAt: t.expected_available_at,
+    cleaningStartedAt: t.cleaning_started_at,
+    shape: t.shape,
+    reservationName: t.reservation_name
+  };
+};
+
 const calculateHaversineKm = (lat1, lon1, lat2, lon2) => {
   if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
   const R = 6371;
@@ -115,7 +156,7 @@ export const getAllRestaurants = async (req, res) => {
           googleMapsUrl: r.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.location)}`,
           image: r.image,
           crowdLevel: r.crowd_level,
-          waitEstimate: r.wait_estimate,
+          waitEstimate: formatWaitEstimate(metrics.estimated_wait_minutes),
           partiesInQueue: r.parties_in_queue,
           openingHours: r.opening_hours,
           aiWalkInProbability: r.ai_walk_in_prob,
@@ -132,16 +173,7 @@ export const getAllRestaurants = async (req, res) => {
           estimated_wait_minutes: metrics.estimated_wait_minutes,
           queue_count: metrics.queue_count,
 
-          tables: tables.map(t => ({
-            id: t.id,
-            name: t.name,
-            capacity: t.capacity,
-            section: t.section,
-            status: t.status,
-            minsRemaining: t.mins_remaining,
-            shape: t.shape,
-            reservationName: t.reservation_name
-          })),
+          tables: tables.map(mapTableResponse),
           menu: menuGrouped
         };
       })
@@ -210,7 +242,7 @@ export const getRestaurantById = async (req, res) => {
         googleMapsUrl: r.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.location)}`,
         image: r.image,
         crowdLevel: r.crowd_level,
-        waitEstimate: r.wait_estimate,
+        waitEstimate: formatWaitEstimate(metrics.estimated_wait_minutes),
         partiesInQueue: r.parties_in_queue,
         openingHours: r.opening_hours,
         aiWalkInProbability: r.ai_walk_in_prob,
@@ -227,16 +259,7 @@ export const getRestaurantById = async (req, res) => {
         estimated_wait_minutes: metrics.estimated_wait_minutes,
         queue_count: metrics.queue_count,
 
-        tables: tables.map(t => ({
-          id: t.id,
-          name: t.name,
-          capacity: t.capacity,
-          section: t.section,
-          status: t.status,
-          minsRemaining: t.mins_remaining,
-          shape: t.shape,
-          reservationName: t.reservation_name
-        })),
+        tables: tables.map(mapTableResponse),
         menu: menuGrouped
       }
     });
@@ -353,7 +376,7 @@ export const getNearbyRestaurants = async (req, res) => {
           googleMapsUrl: r.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.location)}`,
           image: r.image,
           crowdLevel: r.crowd_level,
-          waitEstimate: r.wait_estimate,
+          waitEstimate: formatWaitEstimate(metrics.estimated_wait_minutes),
           openingHours: r.opening_hours,
           sections: safeJsonParse(r.sections_json, []),
           hourlyCrowdForecast: safeJsonParse(r.hourly_crowd_json, []),
@@ -365,7 +388,7 @@ export const getNearbyRestaurants = async (req, res) => {
           occupancy_percentage: metrics.occupancy_percentage,
           estimated_wait_minutes: metrics.estimated_wait_minutes,
           queue_count: metrics.queue_count,
-          tables: tables.map(t => ({ id: t.id, name: t.name, capacity: t.capacity, section: t.section, status: t.status, minsRemaining: t.mins_remaining, shape: t.shape, reservationName: t.reservation_name })),
+          tables: tables.map(mapTableResponse),
           menu: menuGrouped
         };
       })

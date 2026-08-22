@@ -36,11 +36,28 @@ const _status = {
   error: null
 };
 
-export const getDbStatus = () => ({
-  connected: _status.connected,
-  type: _status.type,
-  error: _status.connected ? null : (_status.error || 'Database not initialized')
-});
+export const getDbStatus = async () => {
+  try {
+    await initDb();
+    if (!pool) {
+      return { connected: false, type: DB_CONFIG.type, error: 'Database pool not initialized' };
+    }
+    const connection = await pool.getConnection();
+    await connection.query('SELECT 1');
+    connection.release();
+    return {
+      connected: true,
+      type: DB_CONFIG.type,
+      error: null
+    };
+  } catch (err) {
+    return {
+      connected: false,
+      type: DB_CONFIG.type,
+      error: err.message
+    };
+  }
+};
 
 // ─── Initialization ───────────────────────────────────────────────────────────
 
@@ -82,6 +99,26 @@ const _performInit = async () => {
     // Apply schema
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     await connection.query(schemaSql);
+
+    // Ensure Phase 5 dynamic timestamp columns exist in the tables table
+    try {
+      await connection.query("ALTER TABLE `tables` ADD COLUMN `occupied_at` TIMESTAMP NULL DEFAULT NULL");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE `tables` ADD COLUMN `expected_available_at` TIMESTAMP NULL DEFAULT NULL");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE `tables` ADD COLUMN `cleaning_started_at` TIMESTAMP NULL DEFAULT NULL");
+    } catch (e) {}
+
+    // Phase 6: Ensure users.status column exists for account lifecycle management
+    try {
+      await connection.query("ALTER TABLE `users` ADD COLUMN `status` VARCHAR(50) NOT NULL DEFAULT 'active'");
+    } catch (e) {}
+    // Set seeded demo users to active if not already set
+    try {
+      await connection.query("UPDATE `users` SET `status` = 'active' WHERE `status` IS NULL OR `status` = ''");
+    } catch (e) {}
     
     connection.release();
 

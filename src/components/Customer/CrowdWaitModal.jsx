@@ -49,8 +49,26 @@ export const CrowdWaitModal = ({ isOpen, onClose, restaurantOverride = null }) =
     return sizeMatch && secMatch;
   });
 
+  const getMinsRemaining = (table) => {
+    if (table.status === 'occupied') {
+      if (table.expectedAvailableAt) {
+        const diffMs = new Date(table.expectedAvailableAt).getTime() - Date.now();
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 25;
+    }
+    if (table.status === 'cleaning') {
+      if (table.cleaningStartedAt) {
+        const diffMs = (new Date(table.cleaningStartedAt).getTime() + 5 * 60000) - Date.now();
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 5;
+    }
+    return null;
+  };
+
   const matchingFree = matchingTables.filter(t => t.status === 'available');
-  const matchingOccupied = matchingTables.filter(t => t.status === 'occupied' && t.minsRemaining);
+  const matchingOccupied = matchingTables.filter(t => t.status === 'occupied');
 
   // Find next table freeing up
   let nextFreeTable = null;
@@ -60,9 +78,13 @@ export const CrowdWaitModal = ({ isOpen, onClose, restaurantOverride = null }) =
     nextFreeTable = matchingFree[0];
     nextFreeMins = 0;
   } else if (matchingOccupied.length > 0) {
-    const sortedByMins = [...matchingOccupied].sort((a, b) => a.minsRemaining - b.minsRemaining);
+    const sortedByMins = [...matchingOccupied].sort((a, b) => {
+      const aMins = getMinsRemaining(a) ?? Infinity;
+      const bMins = getMinsRemaining(b) ?? Infinity;
+      return aMins - bMins;
+    });
     nextFreeTable = sortedByMins[0];
-    nextFreeMins = nextFreeTable.minsRemaining;
+    nextFreeMins = getMinsRemaining(nextFreeTable);
   }
 
   // Section by Section occupancy analysis

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   Users, 
@@ -28,6 +28,33 @@ export const FloorMapViewer = ({ onTableSelect }) => {
   const [selectedSection, setSelectedSection] = useState('all');
   const [selectedCapacity, setSelectedCapacity] = useState('all');
   const [hoveredTable, setHoveredTable] = useState(null);
+
+  // Dynamic live countdown clock for tables
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000); // refresh UI clock every 10 seconds
+    return () => clearInterval(timer);
+  }, []);
+
+  const getDisplayMinsRemaining = (table) => {
+    if (table.status === 'occupied') {
+      if (table.expectedAvailableAt) {
+        const diffMs = new Date(table.expectedAvailableAt).getTime() - currentTime;
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 25;
+    }
+    if (table.status === 'cleaning') {
+      if (table.cleaningStartedAt) {
+        const diffMs = (new Date(table.cleaningStartedAt).getTime() + 5 * 60000) - currentTime;
+        return Math.max(0, Math.ceil(diffMs / 60000));
+      }
+      return table.minsRemaining || 5;
+    }
+    return null;
+  };
 
   if (!activeRestaurant) return null;
 
@@ -208,9 +235,15 @@ export const FloorMapViewer = ({ onTableSelect }) => {
                 </div>
 
                 {/* Subtext info */}
-                {isOccupied && table.minsRemaining && (
+                {isOccupied && (
                   <span className="mt-1 text-[10px] bg-rose-950/80 px-1.5 py-0.5 rounded text-rose-300 font-mono">
-                    ~{table.minsRemaining}m left
+                    ~{getDisplayMinsRemaining(table)}m left
+                  </span>
+                )}
+
+                {table.status === 'cleaning' && (
+                  <span className="mt-1 text-[10px] bg-indigo-950/80 px-1.5 py-0.5 rounded text-indigo-300 font-mono animate-pulse">
+                    🧹 ~{getDisplayMinsRemaining(table)}m
                   </span>
                 )}
 
@@ -238,7 +271,10 @@ export const FloorMapViewer = ({ onTableSelect }) => {
               <span className="text-gray-400">• Section: <strong className="text-gray-200">{hoveredTable.section}</strong></span>
               <span className="text-gray-400">• Capacity: <strong className="text-white">{hoveredTable.capacity} guests</strong></span>
               {hoveredTable.status === 'occupied' && (
-                <span className="text-gray-300 font-semibold">Occupied (~{hoveredTable.minsRemaining} mins remaining)</span>
+                <span className="text-gray-300 font-semibold">Occupied (~{getDisplayMinsRemaining(hoveredTable)} mins remaining)</span>
+              )}
+              {hoveredTable.status === 'cleaning' && (
+                <span className="text-indigo-300 font-semibold">Cleaning (~{getDisplayMinsRemaining(hoveredTable)} mins remaining)</span>
               )}
               {hoveredTable.status === 'available' && (
                 <span className="text-white font-semibold animate-pulse">⚡ Click to reserve instantly!</span>
