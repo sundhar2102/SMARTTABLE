@@ -116,13 +116,18 @@ const _performInit = async () => {
       await connection.query("ALTER TABLE `tables` ADD COLUMN `cleaning_started_at` TIMESTAMP NULL DEFAULT NULL");
     } catch (e) {}
 
-    // Phase 6: Ensure users.status column exists for account lifecycle management
+    // Phase 6: Ensure users.status and restaurants.status columns exist for account & lifecycle management
     try {
       await connection.query("ALTER TABLE `users` ADD COLUMN `status` VARCHAR(50) NOT NULL DEFAULT 'active'");
     } catch (e) {}
-    // Set seeded demo users to active if not already set
+    try {
+      await connection.query("ALTER TABLE `restaurants` ADD COLUMN `status` VARCHAR(50) NOT NULL DEFAULT 'live'");
+    } catch (e) {}
+    
+    // Set seeded demo users & restaurants to active/live if not already set
     try {
       await connection.query("UPDATE `users` SET `status` = 'active' WHERE `status` IS NULL OR `status` = ''");
+      await connection.query("UPDATE `restaurants` SET `status` = 'live' WHERE `status` IS NULL OR `status` = ''");
     } catch (e) {}
 
     // Phase 9: Performance Indexes for high-frequency queries

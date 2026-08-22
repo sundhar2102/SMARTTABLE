@@ -304,3 +304,93 @@ export const getPlatformStats = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
+
+// ─── OWNER APPLICATIONS LIFECYCLE ──────────────────────────────────────────
+
+export const getOwnerApplications = async (req, res) => {
+  try {
+    const applications = await queryAll(`
+      SELECT 
+        u.id as userId,
+        u.name as ownerName,
+        u.email as ownerEmail,
+        u.status as userStatus,
+        u.created_at as submittedAt,
+        r.id as restaurantId,
+        r.name as restaurantName,
+        r.cuisine,
+        r.location,
+        r.status as restaurantStatus,
+        r.is_accepting_orders as isAcceptingOrders
+      FROM users u
+      LEFT JOIN restaurants r ON u.restaurant_id = r.id
+      WHERE u.role = 'owner'
+      ORDER BY u.created_at DESC
+    `);
+    return res.json({ success: true, data: applications });
+  } catch (err) {
+    console.error('[adminController.getOwnerApplications]', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+export const approveOwnerApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await queryGet('SELECT * FROM users WHERE (id = ? OR restaurant_id = ?) AND role = "owner"', [id, id]);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Owner application not found.' });
+    }
+
+    const restId = user.restaurant_id;
+
+    await queryRun('UPDATE users SET status = "active" WHERE id = ?', [user.id]);
+    if (restId) {
+      await queryRun('UPDATE restaurants SET status = "live", is_accepting_orders = 1 WHERE id = ?', [restId]);
+    }
+
+    const io = req.app.get('io');
+    if (io && restId) {
+      io.to(`restaurant_${restId}_public`).emit('restaurant_status_changed', {
+        id: restId,
+        isAcceptingOrders: true,
+        status: 'live'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Owner application for ${user.name} approved successfully. Restaurant is now LIVE.`,
+      data: { userId: user.id, restaurantId: restId, userStatus: 'active', restaurantStatus: 'live' }
+    });
+  } catch (err) {
+    console.error('[adminController.approveOwnerApplication]', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+export const rejectOwnerApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await queryGet('SELECT * FROM users WHERE (id = ? OR restaurant_id = ?) AND role = "owner"', [id, id]);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Owner application not found.' });
+    }
+
+    const restId = user.restaurant_id;
+
+    await queryRun('UPDATE users SET status = "rejected" WHERE id = ?', [user.id]);
+    if (restId) {
+      await queryRun('UPDATE restaurants SET status = "rejected", is_accepting_orders = 0 WHERE id = ?', [restId]);
+    }
+
+    return res.json({
+      success: true,
+      message: `Owner application for ${user.name} rejected.`,
+      data: { userId: user.id, restaurantId: restId, userStatus: 'rejected', restaurantStatus: 'rejected' }
+    });
+  } catch (err) {
+    console.error('[adminController.rejectOwnerApplication]', err.message);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};

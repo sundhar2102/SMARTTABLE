@@ -86,8 +86,10 @@ export const getAllRestaurants = async (req, res) => {
     let restaurants = [];
     const radiiToTry = [maxRadius, 10.0, 15.0, 100.0];
     
-    // Fetch all restaurants from DB first to do engine-agnostic Haversine in JS
-    const allDbRestaurants = await queryAll('SELECT * FROM restaurants');
+    // Fetch ONLY live, accepting-orders restaurants for customer discovery
+    const allDbRestaurants = await queryAll(
+      "SELECT * FROM restaurants WHERE is_accepting_orders = 1 AND (status IS NULL OR status IN ('live', 'active', 'approved'))"
+    );
 
     for (const currentRadius of radiiToTry) {
       if (currentRadius < maxRadius) continue; // Skip if user requested a larger initial radius

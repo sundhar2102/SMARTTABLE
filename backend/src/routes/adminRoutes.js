@@ -9,7 +9,10 @@ import {
   updateOwnerStatus,
   listRestaurants,
   updateRestaurantStatus,
-  getPlatformStats
+  getPlatformStats,
+  getOwnerApplications,
+  approveOwnerApplication,
+  rejectOwnerApplication
 } from '../controllers/adminController.js';
 import { getPlatformAnalytics, getRestaurantAnalytics } from '../controllers/analyticsController.js';
 
@@ -23,6 +26,11 @@ router.use(requireRole('admin'));
 router.get('/stats', getPlatformStats);
 router.get('/platform-analytics', getPlatformAnalytics);
 router.get('/analytics/:id', getRestaurantAnalytics);
+
+// ── Owner Applications Lifecycle ───────────────────────────────────────────
+router.get('/owner-applications', getOwnerApplications);
+router.post('/owner-applications/:id/approve', approveOwnerApplication);
+router.post('/owner-applications/:id/reject', rejectOwnerApplication);
 
 // ── User Management ─────────────────────────────────────────────────────────
 router.get('/users', listUsers);

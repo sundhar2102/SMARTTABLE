@@ -56,6 +56,11 @@ export const login = async (req, res) => {
       });
     }
 
+    let restaurantInfo = null;
+    if (user.role === 'owner' && user.restaurant_id) {
+      restaurantInfo = await queryGet('SELECT * FROM restaurants WHERE id = ?', [user.restaurant_id]);
+    }
+
     const token = jwt.sign(
       { id: user.id, role: user.role, restaurantId: user.restaurant_id || null },
       JWT_SECRET,
@@ -71,7 +76,10 @@ export const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        restaurantId: user.restaurant_id || restaurantId
+        restaurantId: user.restaurant_id || restaurantId,
+        status: user.status || 'active',
+        restaurantStatus: restaurantInfo ? (restaurantInfo.status || (restaurantInfo.is_accepting_orders ? 'live' : 'pending')) : 'pending',
+        isAcceptingOrders: restaurantInfo ? Boolean(restaurantInfo.is_accepting_orders) : false
       }
     });
   } catch (error) {
@@ -128,29 +136,52 @@ export const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(password, salt);
 
-    // We chose Option B: Skip OTP entirely.
-    // Insert verified user directly
+    let assignedRestaurantId = restaurantId || null;
+    let initialUserStatus = 'active';
+
+    if (finalRole === 'owner') {
+      initialUserStatus = 'pending';
+      if (!assignedRestaurantId) {
+        const slugName = (restaurantName || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        assignedRestaurantId = `${slugName}-${Date.now().toString().slice(-4)}`;
+      }
+
+      // Create PENDING restaurant that is NOT live
+      const existingRest = await queryGet('SELECT * FROM restaurants WHERE id = ?', [assignedRestaurantId]);
+      if (!existingRest) {
+        await queryRun(
+          `INSERT INTO restaurants (id, name, cuisine, location, is_accepting_orders, status)
+           VALUES (?, ?, 'Multi-Cuisine', ?, 0, 'pending')`,
+          [assignedRestaurantId, restaurantName || `${name}'s Restaurant`, city || 'Chennai']
+        );
+      }
+    }
+
+    // Insert user with initial status
     await queryRun(
-      'INSERT INTO users (id, name, email, role, password_hash, restaurant_id, is_verified) VALUES (?, ?, ?, ?, ?, ?, 1)',
-      [userId, name.trim(), cleanEmail, finalRole, hash, restaurantId || null]
+      'INSERT INTO users (id, name, email, role, password_hash, restaurant_id, status, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+      [userId, name.trim(), cleanEmail, finalRole, hash, assignedRestaurantId, initialUserStatus]
     );
 
     const token = jwt.sign(
-      { id: userId, role: finalRole, restaurantId: restaurantId || null },
+      { id: userId, role: finalRole, restaurantId: assignedRestaurantId },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
+      message: finalRole === 'owner' 
+        ? 'Owner application submitted successfully. Pending Admin approval.' 
+        : 'Registration successful',
       token,
       data: {
         id: userId,
         name: name.trim(),
         email: cleanEmail,
         role: finalRole,
-        restaurantId: restaurantId || null
+        restaurantId: assignedRestaurantId,
+        status: initialUserStatus
       }
     });
   } catch (error) {

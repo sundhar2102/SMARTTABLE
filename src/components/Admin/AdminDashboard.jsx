@@ -286,6 +286,50 @@ export const AdminDashboard = () => {
     updateTableBill(currentRest.id, targetRes.tableId, updatedItems, billDiscountPercent, billServiceCharge);
   };
 
+  // Owner Application Pending Guard
+  if (user?.role === 'owner' && (user?.status === 'pending' || currentRest?.status === 'pending' || currentRest?.is_accepting_orders === 0)) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center p-6 bg-gray-50 text-black animate-in fade-in">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-black shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-black text-amber-600 flex items-center justify-center mx-auto shadow-md">
+            <Hourglass className="w-8 h-8 animate-pulse" />
+          </div>
+          
+          <div className="space-y-2">
+            <span className="px-3 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-black">
+              Application Under Review
+            </span>
+            <h3 className="text-xl font-black text-black tracking-tight pt-2">
+              {currentRest?.name || 'Your Restaurant Application'}
+            </h3>
+            <p className="text-xs text-gray-600">
+              Your restaurant registration has been submitted and is currently under review by the SmartTable Admin team.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gray-50 border border-gray-300 text-left space-y-2 text-xs font-mono">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Owner Email:</span>
+              <span className="font-bold text-black">{user?.email}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Application Status:</span>
+              <span className="font-extrabold text-amber-700 uppercase">PENDING</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Customer Discovery:</span>
+              <span className="font-extrabold text-rose-600">HIDDEN (OFFLINE)</span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-gray-500 italic">
+            Once approved by Admin, your restaurant will become LIVE and customer table bookings will open automatically.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in">
       {/* Top Restaurant Property Header */}
@@ -312,24 +356,34 @@ export const AdminDashboard = () => {
             <p className="text-xs text-gray-600">{currentRest.cuisine} • {currentRest.location}</p>
           </div>
 
-          {/* Controls: Switch Property, Sound Alerts, Approvals */}
+          {/* Controls: Sound Alerts, Approvals */}
           <div className="flex flex-wrap items-center gap-3">
             
-            {/* Switch Restaurant Dropdown */}
-            <div className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs shadow-xs">
-              <label className="text-[10px] text-gray-500 uppercase font-bold block">Managed Property:</label>
-              <select
-                value={currentRest.id}
-                onChange={(e) => handlePropertyChange(e.target.value)}
-                className="bg-transparent text-[#0a0d0a] font-bold outline-none cursor-pointer"
-              >
-                {restaurants.map(r => (
-                  <option key={r.id} value={r.id} className="bg-white text-gray-900">
-                    {r.name} ({r.location})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Show property name / single owner badge */}
+            {user?.role === 'admin' ? (
+              <div className="bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs shadow-xs">
+                <label className="text-[10px] text-gray-500 uppercase font-bold block">Platform Property:</label>
+                <select
+                  value={currentRest.id}
+                  onChange={(e) => handlePropertyChange(e.target.value)}
+                  className="bg-transparent text-[#0a0d0a] font-bold outline-none cursor-pointer"
+                >
+                  {restaurants.map(r => (
+                    <option key={r.id} value={r.id} className="bg-white text-gray-900">
+                      {r.name} ({r.location})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-300 rounded-xl px-3.5 py-1.5 text-xs shadow-xs flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <div>
+                  <span className="text-[9px] text-gray-500 uppercase font-bold block">My Restaurant</span>
+                  <span className="font-extrabold text-black">{currentRest.name}</span>
+                </div>
+              </div>
+            )}
 
             {/* Sound Toggle */}
             <button
