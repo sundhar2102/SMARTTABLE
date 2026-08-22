@@ -116,7 +116,7 @@ export const getOrdersByCustomer = async (req, res) => {
     const email = req.user.role === 'customer' ? req.user.email : (req.query.email || req.user.email);
     let rows;
     if (req.user.role === 'customer') {
-      rows = await queryAll('SELECT * FROM orders WHERE guest_email = ? ORDER BY created_at DESC', [req.user.email]);
+      rows = await queryAll('SELECT * FROM orders WHERE (guest_email = ? OR user_id = ?) ORDER BY created_at DESC', [req.user.email, req.user.id]);
     } else if (req.user.role === 'owner' || req.user.role === 'admin') {
       if (req.user.restaurantId) {
         rows = await queryAll('SELECT * FROM orders WHERE guest_email = ? AND restaurant_id = ? ORDER BY created_at DESC', [email, req.user.restaurantId]);

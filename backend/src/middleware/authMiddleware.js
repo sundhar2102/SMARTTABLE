@@ -26,9 +26,19 @@ export const requireAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
     
     // Resolve full user profile from the database to keep JWT payload minimal and avoid PII leakage
-    const user = await queryGet('SELECT id, name, email, role, restaurant_id FROM users WHERE id = ?', [decoded.id]);
+    const user = await queryGet('SELECT id, name, email, role, restaurant_id, status FROM users WHERE id = ?', [decoded.id]);
     if (!user) {
       return res.status(401).json({ success: false, message: 'Unauthorized: User account not found.' });
+    }
+
+    // Phase 8: Immediately invalidate sessions for suspended or rejected accounts
+    if (user.status === 'suspended' || user.status === 'rejected') {
+      return res.status(403).json({ 
+        success: false, 
+        message: user.status === 'suspended' 
+          ? 'Forbidden: Your account has been suspended.' 
+          : 'Forbidden: Your account registration was rejected.' 
+      });
     }
 
     req.user = {

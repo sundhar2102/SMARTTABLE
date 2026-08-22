@@ -270,8 +270,8 @@ export const getAllReservations = async (req, res) => {
     const params = [];
 
     if (req.user.role === 'customer') {
-      sql += ' WHERE guest_email = ?';
-      params.push(req.user.email);
+      sql += ' WHERE (guest_email = ? OR user_id = ?)';
+      params.push(req.user.email, req.user.id);
     } else if (req.user.role === 'owner' || req.user.role === 'admin') {
       const targetRestId = req.user.restaurantId || restaurantId;
       if (!targetRestId) {
