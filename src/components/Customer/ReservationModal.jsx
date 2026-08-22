@@ -48,7 +48,8 @@ export const ReservationModal = () => {
   const [guestPhone, setGuestPhone] = useState(user?.phone || '');
   const [partySize, setPartySize] = useState(2);
   const [preferredSection, setPreferredSection] = useState('Any Section (Best Available)');
-  const [date, setDate] = useState('2026-08-14');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [date, setDate] = useState(todayStr);
   const [time, setTime] = useState('19:30');
   const [specialRequests, setSpecialRequests] = useState('');
   
