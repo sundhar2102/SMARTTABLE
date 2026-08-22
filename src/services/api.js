@@ -208,6 +208,58 @@ export const apiService = {
     }
   },
 
+  // 5b. Menu Management
+  getMenuByRestaurant: async (restaurantId) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/menu/${restaurantId}`);
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn(`apiService.getMenuByRestaurant(${restaurantId}) error:`, err.message);
+      return null;
+    }
+  },
+
+  addMenuItem: async (menuItemData) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/menu`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(menuItemData)
+      });
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn('apiService.addMenuItem error:', err.message);
+      throw err;
+    }
+  },
+
+  updateMenuItem: async (itemId, menuItemData) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/menu/${itemId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(menuItemData)
+      });
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn(`apiService.updateMenuItem(${itemId}) error:`, err.message);
+      throw err;
+    }
+  },
+
+  deleteMenuItem: async (itemId) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/menu/${itemId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      return await handleResponse(res);
+    } catch (err) {
+      console.warn(`apiService.deleteMenuItem(${itemId}) error:`, err.message);
+      throw err;
+    }
+  },
+
   // 6. Orders
   getAllOrders: async () => {
     try {

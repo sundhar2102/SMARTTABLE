@@ -96,14 +96,22 @@ export const PayBillModal = () => {
     setCouponError('');
   };
 
-  const handleProcessPayment = () => {
+  const handleProcessPayment = async () => {
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      const res = await apiService.initiatePayment({
+        bookingId: activeBillReservation?.id,
+        restaurantId: activeBillReservation?.restaurantId,
+        amount: grandTotal,
+        paymentMethod: paymentMethod === 'upi' ? `Instant UPI (${UPI_ID})` : paymentMethod === 'card' ? 'Credit Card (Visa)' : 'Net Banking (Demo PG)',
+        gateway: 'Razorpay Test PG (Demo Mode)'
+      });
+
       setIsProcessing(false);
       setIsPaidSuccess(true);
 
-      const txnId = `TXN-UPI-${Math.floor(100000 + Math.random() * 900000)}`;
+      const txnId = res?.data?.transactionId || `TXN-UPI-${Math.floor(100000 + Math.random() * 900000)}`;
       const invoiceId = `INV-ST-${Date.now().toString().slice(-6)}`;
       const paidData = {
         transactionId: txnId,
@@ -113,16 +121,19 @@ export const PayBillModal = () => {
         gstAmount,
         tipAmount: effectiveTip,
         discountAmount,
-        paymentMethod: paymentMethod === 'upi' ? `Instant UPI (${UPI_ID})` : paymentMethod === 'card' ? 'Credit Card (Visa)' : 'Net Banking',
+        paymentMethod: paymentMethod === 'upi' ? `Instant UPI (${UPI_ID})` : paymentMethod === 'card' ? 'Credit Card (Visa)' : 'Net Banking (Demo PG)',
         paidAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         date: new Date().toISOString().split('T')[0]
       };
 
       setReceiptDetails(paidData);
 
-      // Settle in central AppContext
+      // Settle in central AppContext & MySQL DB
       settleBillPayment(activeBillReservation.id, paidData);
-    }, 1400);
+    } catch (err) {
+      setIsProcessing(false);
+      triggerToast('Payment Failed ❌', err.message || 'Unable to process payment. Please try again.', 'alert');
+    }
   };
 
   const toggleCompliment = (comp) => {

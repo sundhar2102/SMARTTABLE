@@ -30,7 +30,7 @@ const PORT = process.env.PORT || 5000;
 // Expose io to routes
 app.set('io', io);
 
-const JWT_SECRET = process.env.JWT_SECRET;
+import { JWT_SECRET } from './config/jwt.js';
 
 // Socket.io connection authentication middleware (optional - guests allowed for public room access)
 io.use(async (socket, next) => {

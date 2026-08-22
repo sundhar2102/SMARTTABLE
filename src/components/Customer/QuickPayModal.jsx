@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import { 
   X, 
   Zap, 
@@ -35,14 +36,23 @@ export const QuickPayModal = () => {
 
   if (!quickPayModalOpen) return null;
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      const res = await apiService.initiatePayment({
+        bookingId: quickPayConfig?.bookingId || null,
+        restaurantId: quickPayConfig?.restaurantId || 'on-de-roof-chennai',
+        amount: Number(amount || 0),
+        paymentMethod: `Instant UPI (${UPI_ID})`,
+        gateway: 'Instant UPI Test PG (Demo Mode)',
+        customNote
+      });
+
       setIsProcessing(false);
       setPaymentSuccess(true);
       
-      const txnId = `TXN-UPI-${Math.floor(100000 + Math.random() * 900000)}`;
+      const txnId = res?.data?.transactionId || `TXN-UPI-${Math.floor(100000 + Math.random() * 900000)}`;
       const details = {
         transactionId: txnId,
         upiId: UPI_ID,
@@ -54,8 +64,11 @@ export const QuickPayModal = () => {
       };
       setTransactionDetails(details);
 
-      triggerToast('Payment verified', `₹${amount} paid to ${UPI_ID} successfully.`, 'info');
-    }, 1200);
+      triggerToast('Payment Verified ✅', `₹${amount} paid to ${UPI_ID} successfully. Recorded in database.`, 'info');
+    } catch (err) {
+      setIsProcessing(false);
+      triggerToast('Payment Error ❌', err.message || 'Failed to process payment.', 'alert');
+    }
   };
 
   const handleClose = () => {

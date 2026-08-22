@@ -2,11 +2,7 @@ import { queryAll, queryGet, queryRun } from '../../database/db.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { sendOTP } from '../services/emailService.js';
-
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('FATAL: JWT_SECRET environment variable is missing.');
-}
+import { JWT_SECRET } from '../config/jwt.js';
 
 export const login = async (req, res) => {
   try {

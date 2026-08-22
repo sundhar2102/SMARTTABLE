@@ -36,26 +36,34 @@ export const PaymentGatewayModal = ({ isOpen, onClose, billData, onPaymentSucces
   const restaurantName = billData.restaurantName || 'SmartTable Restaurant';
   const guestName = billData.guestName || 'Diner Guest';
 
-  const handleProcessPayment = (e) => {
+  const handleProcessPayment = async (e) => {
     e?.preventDefault();
     setIsProcessing(true);
 
-    setTimeout(() => {
+    try {
+      const res = await apiService.initiatePayment({
+        bookingId: billData.id || billData.bookingId || null,
+        restaurantId: billData.restaurantId || 'on-de-roof-chennai',
+        amount: totalAmount,
+        paymentMethod: selectedGateway.toUpperCase(),
+        gateway: selectedGateway === 'razorpay' ? 'Razorpay PG (Demo Mode)' : selectedGateway === 'stripe' ? 'Stripe Payments (Demo Mode)' : 'Instant UPI Gateway (Demo Mode)'
+      });
+
       setIsProcessing(false);
       setIsPaidSuccess(true);
 
-      const txnId = selectedGateway === 'razorpay' 
+      const txnId = res?.data?.transactionId || (selectedGateway === 'razorpay' 
         ? `pay_rzp_${Math.floor(10000000 + Math.random() * 90000000)}` 
         : selectedGateway === 'stripe'
           ? `ch_strp_${Math.floor(10000000 + Math.random() * 90000000)}`
-          : `upi_txn_${Math.floor(10000000 + Math.random() * 90000000)}`;
+          : `upi_txn_${Math.floor(10000000 + Math.random() * 90000000)}`);
 
       const invoiceId = `INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       
       const successPayload = {
         transactionId: txnId,
         invoiceId,
-        gateway: selectedGateway === 'razorpay' ? 'Razorpay PG' : selectedGateway === 'stripe' ? 'Stripe Payments' : 'Instant UPI Gateway',
+        gateway: selectedGateway === 'razorpay' ? 'Razorpay PG (Demo Mode)' : selectedGateway === 'stripe' ? 'Stripe Payments (Demo Mode)' : 'Instant UPI Gateway (Demo Mode)',
         paidAmount: totalAmount,
         paidAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         paymentMethod: selectedGateway.toUpperCase()
@@ -64,7 +72,7 @@ export const PaymentGatewayModal = ({ isOpen, onClose, billData, onPaymentSucces
       setPaymentDetails(successPayload);
 
       triggerToast(
-        'Payment collected successfully',
+        'Payment Collected & Recorded ✅',
         `₹${totalAmount} settled via ${successPayload.gateway} (Ref: ${txnId}).`,
         'info'
       );
@@ -72,7 +80,10 @@ export const PaymentGatewayModal = ({ isOpen, onClose, billData, onPaymentSucces
       if (onPaymentSuccess) {
         onPaymentSuccess(successPayload);
       }
-    }, 1200);
+    } catch (err) {
+      setIsProcessing(false);
+      triggerToast('Payment Error ❌', err.message || 'Could not process payment.', 'alert');
+    }
   };
 
   const handleClose = () => {

@@ -134,25 +134,32 @@ export const SuperAdminDashboard = () => {
   const confirmedBookingsCount = userReservations.filter(r => r.status === 'Accepted' || r.status === 'Confirmed' || r.orderStatus === 'Accepted').length;
 
   // Restaurant Status Management Actions
-  const handleUpdateRestaurantStatus = (restaurantId, newStatus) => {
-    setRestaurants(prev => prev.map(r => {
-      if (r.id === restaurantId) {
-        return { ...r, status: newStatus };
+  const handleUpdateRestaurantStatus = async (restaurantId, newStatus) => {
+    const isAccepting = newStatus === 'live' || newStatus === 'approved';
+    try {
+      await apiService.admin.updateRestaurantStatus(restaurantId, isAccepting);
+
+      setRestaurants(prev => prev.map(r => {
+        if (r.id === restaurantId) {
+          return { ...r, status: newStatus, is_accepting_orders: isAccepting ? 1 : 0 };
+        }
+        return r;
+      }));
+
+      const target = restaurants.find(r => r.id === restaurantId);
+      const restName = target?.name || restaurantId;
+
+      if (newStatus === 'live') {
+        triggerToast('Restaurant Made Live 🚀', `${restName} is now visible to customers for table bookings.`, 'info');
+      } else if (newStatus === 'deactivated') {
+        triggerToast('Restaurant Deactivated', `${restName} has been deactivated. New customer bookings are disabled.`, 'alert');
+      } else if (newStatus === 'approved') {
+        triggerToast('Restaurant Approved ✅', `${restName} has been approved.`, 'info');
+      } else if (newStatus === 'rejected') {
+        triggerToast('Restaurant Rejected', `${restName} application has been rejected.`, 'alert');
       }
-      return r;
-    }));
-
-    const target = restaurants.find(r => r.id === restaurantId);
-    const restName = target?.name || restaurantId;
-
-    if (newStatus === 'live') {
-      triggerToast('Restaurant Made Live 🚀', `${restName} is now visible to customers for table bookings.`, 'info');
-    } else if (newStatus === 'deactivated') {
-      triggerToast('Restaurant Deactivated', `${restName} has been deactivated. New customer bookings are disabled.`, 'alert');
-    } else if (newStatus === 'approved') {
-      triggerToast('Restaurant Approved ✅', `${restName} has been approved.`, 'info');
-    } else if (newStatus === 'rejected') {
-      triggerToast('Restaurant Rejected', `${restName} application has been rejected.`, 'alert');
+    } catch (err) {
+      triggerToast('Update Failed ❌', err.message || 'Could not update restaurant status.', 'alert');
     }
   };
 

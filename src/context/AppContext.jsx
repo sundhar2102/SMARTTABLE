@@ -364,6 +364,33 @@ export const AppProvider = ({ children }) => {
       }
     });
 
+    socket.on('payment_completed', (data) => {
+      console.log('[Socket] Received payment_completed:', data);
+      if (data && data.bookingId) {
+        setUserReservations(prev => prev.map(res => {
+          if (res.id === data.bookingId) {
+            return { 
+              ...res, 
+              paymentStatus: 'SUCCESS', 
+              paymentTxnId: data.transactionId, 
+              paidAmount: data.amount 
+            };
+          }
+          return res;
+        }));
+      }
+    });
+
+    socket.on('menu_updated', async (data) => {
+      console.log('[Socket] Received menu_updated:', data);
+      try {
+        const freshRests = await apiService.getAllRestaurants();
+        if (freshRests && freshRests.length > 0) {
+          setRestaurants(freshRests);
+        }
+      } catch (e) {}
+    });
+
     return () => {
       socket.off('connect', joinRoom);
       socket.emit('leave_restaurant', selectedRestaurantId);
@@ -374,6 +401,8 @@ export const AppProvider = ({ children }) => {
       socket.off('restaurant_status_changed');
       socket.off('new_order');
       socket.off('new_reservation');
+      socket.off('payment_completed');
+      socket.off('menu_updated');
     };
   }, [socket, selectedRestaurantId]);
 

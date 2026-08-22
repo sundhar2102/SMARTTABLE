@@ -188,7 +188,27 @@ CREATE TABLE IF NOT EXISTS `users` (
     INDEX `idx_users_role` (`role`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 8. Marketplace Settings
+-- 8. Payments
+CREATE TABLE IF NOT EXISTS `payments` (
+    `id`               VARCHAR(255) PRIMARY KEY,
+    `booking_id`       VARCHAR(255),
+    `order_id`         VARCHAR(255),
+    `user_id`          VARCHAR(255),
+    `restaurant_id`    VARCHAR(255) NOT NULL,
+    `amount`           DECIMAL(10, 2) NOT NULL,
+    `currency`         VARCHAR(10) DEFAULT 'INR',
+    `payment_method`   VARCHAR(100) NOT NULL,
+    `payment_status`   VARCHAR(50) NOT NULL DEFAULT 'SUCCESS',
+    `gateway`          VARCHAR(100) DEFAULT 'Razorpay Test PG',
+    `transaction_id`   VARCHAR(255) NOT NULL,
+    `created_at`       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`id`) ON DELETE CASCADE,
+    INDEX `idx_payments_restaurant` (`restaurant_id`),
+    INDEX `idx_payments_user` (`user_id`),
+    INDEX `idx_payments_booking` (`booking_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9. Marketplace Settings
 CREATE TABLE IF NOT EXISTS `marketplace_settings` (
     `key`        VARCHAR(255) PRIMARY KEY,
     `value_json` JSON NOT NULL
