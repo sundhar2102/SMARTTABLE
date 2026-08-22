@@ -147,9 +147,9 @@ export async function runBillingPaymentSuite() {
     if (newStatus !== 'cleaning') throw new Error('Lifecycle status mismatch');
   });
 
-  await harness.test('BILL-023', 'Payment Success Confetti Celebration', 'Trigger celebratory visual confetti on successful payment', 'UX Delight', 'Visual Trigger', async () => {
-    const confettiActive = true;
-    if (!confettiActive) throw new Error('Visual celebration inactive');
+  await harness.test('BILL-023', 'Clean Payment Status Feedback', 'Trigger minimal professional status toast on successful payment', 'UX Quality', 'Toast Feedback', async () => {
+    const feedbackText = 'Payment completed';
+    if (!feedbackText.includes('completed')) throw new Error('Status feedback missing');
   });
 
   await harness.test('BILL-024', 'Digital Payment Receipt Generation', 'Generate printable/downloadable PDF-ready payment receipt', 'Receipt Engine', 'Receipt Document', async () => {

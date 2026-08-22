@@ -81,7 +81,10 @@ async function runMasterE2ETestEngine() {
   const reportPath = await generateExcelReport(allTestResults, 'test-reports');
 
   if (failed > 0) {
-    console.error(`\n❌ Test execution failed with ${failed} failing test cases.`);
+    console.error(`\n❌ Test execution failed with ${failed} failing test cases:`);
+    allTestResults.filter(r => r.status === 'FAIL').forEach(f => {
+      console.error(` - [${f.id}] ${f.name}: ${f.error || f.details}`);
+    });
     process.exit(1);
   } else {
     console.log(`\n🎉 All ${passed} test cases passed successfully!`);

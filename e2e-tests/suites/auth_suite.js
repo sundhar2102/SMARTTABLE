@@ -91,13 +91,19 @@ export async function runAuthSuite() {
 
   // 6-10: Login & Token verification
   await harness.test('AUTH-006', 'Customer Login', 'Authenticate customer with valid credentials and return JWT token', 'Customer', 'Auth API', async () => {
+    const email = `login_diner_${Date.now()}@smarttable.in`;
+    await fetch(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Login Diner', email, password: 'password123', role: 'customer' })
+    });
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'testdiner11@smarttable.in', password: 'password' })
+      body: JSON.stringify({ email, password: 'password123' })
     });
     const json = await res.json();
-    if (res.status !== 200 && res.status !== 429) throw new Error('Login endpoint unexpected failure');
+    if ((res.status !== 200 || !json.token) && res.status !== 429) throw new Error('Login endpoint failed to issue token');
   });
 
   await harness.test('AUTH-007', 'Invalid Password', 'Reject login attempt with incorrect password', 'Customer', 'Security Check', async () => {
@@ -271,7 +277,7 @@ export async function runAuthSuite() {
 
   await harness.test('AUTH-030', 'Password Hashing Security', 'Verify password hashes in MySQL are stored as bcrypt hashes ($2a$/$2b$)', 'Security', 'DB Invariant', async () => {
     if (conn) {
-      const [rows] = await conn.query('SELECT password_hash FROM users WHERE email = "admin@smarttable.ai" LIMIT 1');
+      const [rows] = await conn.query('SELECT password_hash FROM users WHERE email = "admin@smarttable.in" LIMIT 1');
       if (rows.length > 0 && !rows[0].password_hash.startsWith('$2')) {
         throw new Error('Password hash is not in bcrypt format');
       }

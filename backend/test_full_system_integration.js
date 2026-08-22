@@ -128,7 +128,7 @@ async function runSystemIntegrationTest() {
     // ── STEP 4: TABLE RESERVATION FLOW ────────────────────────────────────────
     console.log('\n--- Step 4: Customer Creates Reservation ---');
     const targetTableId = targetRest.tables[0].id;
-    const testDate = `2026-11-${Math.floor(10 + Math.random() * 18)}`;
+    const testDate = `2027-09-${Math.floor(10 + Math.random() * 18)}`;
     const bookingRes = await fetch(`${BACKEND_URL}/reservations`, {
       method: 'POST',
       headers: {
