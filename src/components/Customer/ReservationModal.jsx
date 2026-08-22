@@ -474,14 +474,65 @@ export const ReservationModal = () => {
                 </div>
 
                 {availabilityData && (
-                  <div className="pt-0.5">
+                  <div className="space-y-2 pt-1">
+                    {/* Visual Floor Status Breakdown */}
+                    <div className="grid grid-cols-5 gap-1 text-[9px] font-mono text-center">
+                      <div className="p-1 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-300">
+                        <span className="block font-bold">AVAILABLE</span>
+                        <span>{availabilityData.statusBreakdown?.AVAILABLE ?? availabilityData.availableCount}</span>
+                      </div>
+                      <div className="p-1 rounded bg-amber-950/60 border border-amber-800 text-amber-300">
+                        <span className="block font-bold">OCCUPIED</span>
+                        <span>{availabilityData.statusBreakdown?.OCCUPIED ?? 0}</span>
+                      </div>
+                      <div className="p-1 rounded bg-purple-950/60 border border-purple-800 text-purple-300">
+                        <span className="block font-bold">RESERVED</span>
+                        <span>{availabilityData.statusBreakdown?.RESERVED ?? 0}</span>
+                      </div>
+                      <div className="p-1 rounded bg-blue-950/60 border border-blue-800 text-blue-300">
+                        <span className="block font-bold">CLEANING</span>
+                        <span>{availabilityData.statusBreakdown?.CLEANING ?? 0}</span>
+                      </div>
+                      <div className="p-1 rounded bg-cyan-950/60 border border-cyan-800 text-cyan-300">
+                        <span className="block font-bold">SOON</span>
+                        <span>{availabilityData.statusBreakdown?.COMING_SOON ?? 0}</span>
+                      </div>
+                    </div>
+
                     {availabilityData.availableCount === 0 ? (
-                      <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                        <div>
-                          <p className="font-bold text-rose-200">No tables available for {time} on {date} ({partySize} guest{partySize > 1 ? 's' : ''}).</p>
-                          <p className="text-[11px] text-rose-300/80">Please select another time slot or date.</p>
+                      <div className="p-3 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                          <div>
+                            <p className="font-bold text-rose-200">No tables immediately free for {time} on {date} ({partySize} guest{partySize > 1 ? 's' : ''}).</p>
+                            <p className="text-[11px] text-rose-300/80">Est. table availability: <strong>{availabilityData.estimatedReadyTime || 'Soon'}</strong> (~{availabilityData.estimatedWaitMinutes || 25} min wait)</p>
+                          </div>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await apiService.joinWaitlist({
+                                restaurantId: activeRestaurant.id,
+                                guestName: name || 'Guest Diner',
+                                guestPhone: phone || '9876543210',
+                                guestEmail: email || 'guest@example.com',
+                                partySize: Number(partySize || 2)
+                              });
+                              if (res.success) {
+                                triggerToast('Joined Waitlist! 📋', `You are #${res.data.queuePosition} in queue. Est. Ready: ${res.data.estimatedReadyTime}`, 'info');
+                                onClose();
+                              }
+                            } catch (err) {
+                              triggerToast('Waitlist Error ❌', err.message || 'Failed to join waitlist.', 'alert');
+                            }
+                          }}
+                          className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                        >
+                          <Hourglass className="w-3.5 h-3.5" />
+                          <span>Join Virtual Waitlist Queue (Est. Ready: {availabilityData.estimatedReadyTime || 'Soon'})</span>
+                        </button>
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-1.5 pt-1">

@@ -124,11 +124,29 @@ const _performInit = async () => {
       await connection.query("ALTER TABLE `restaurants` ADD COLUMN `status` VARCHAR(50) NOT NULL DEFAULT 'live'");
     } catch (e) {}
     
-    // Set seeded demo users & restaurants to active/live if not already set
+    // Phase 2: Create waitlist table for virtual queue management
     try {
-      await connection.query("UPDATE `users` SET `status` = 'active' WHERE `status` IS NULL OR `status` = ''");
-      await connection.query("UPDATE `restaurants` SET `status` = 'live' WHERE `status` IS NULL OR `status` = ''");
-    } catch (e) {}
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS waitlist (
+          id VARCHAR(100) PRIMARY KEY,
+          restaurant_id VARCHAR(100) NOT NULL,
+          user_id VARCHAR(100),
+          guest_name VARCHAR(255) NOT NULL,
+          guest_phone VARCHAR(50) NOT NULL,
+          guest_email VARCHAR(255),
+          party_size INT NOT NULL DEFAULT 2,
+          status VARCHAR(50) NOT NULL DEFAULT 'waiting',
+          estimated_wait_mins INT DEFAULT 20,
+          estimated_ready_time VARCHAR(50),
+          queue_position INT DEFAULT 1,
+          notes TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_waitlist_restaurant_status (restaurant_id, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+    } catch (e) {
+      console.error('[db.js] Error initializing waitlist table:', e.message);
+    }
 
     // Phase 9: Performance Indexes for high-frequency queries
     const performanceIndexes = [

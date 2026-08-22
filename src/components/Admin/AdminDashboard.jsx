@@ -529,6 +529,18 @@ export const AdminDashboard = () => {
           <Activity className="w-4 h-4 text-emerald-600" />
           <span>Analytics & Smart Predictions</span>
         </button>
+
+        <button
+          onClick={() => setActiveAdminTab('waitlist')}
+          className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-xs ${
+            activeAdminTab === 'waitlist'
+              ? 'bg-[#0a0d0a] text-white shadow-md'
+              : 'text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          <Hourglass className="w-4 h-4 text-amber-500" />
+          <span>Virtual Waitlist Queue</span>
+        </button>
       </div>
 
       {/* TAB 1: RESERVATIONS & KITCHEN ORDERS (Accept / Decline) */}
@@ -1520,6 +1532,47 @@ export const AdminDashboard = () => {
         billData={activePaymentBill}
         onPaymentSuccess={handlePaymentCompleted}
       />
+      {/* TAB 6: VIRTUAL WAITLIST QUEUE (Phase 2) */}
+      {activeAdminTab === 'waitlist' && (
+        <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm space-y-6 animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200">
+                <Hourglass className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Virtual Waitlist Queue</h3>
+                <p className="text-xs text-slate-500">Live walk-in queue management for {currentRest.name}</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const data = await apiService.getWaitlistStatus(currentRest.id);
+                  if (data?.data?.activeQueue) {
+                    triggerToast('Waitlist Refreshed 🔄', `${data.data.activeQueue.length} customers in queue.`, 'info');
+                  }
+                } catch (e) {
+                  triggerToast('Error ❌', 'Failed to refresh queue.', 'alert');
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh Queue</span>
+            </button>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+            <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">Staff Quick Actions & Guidelines</h4>
+            <p className="text-slate-600">
+              When a table becomes available on the floor, click <strong>"Notify Customer"</strong> to send an alert. When the diner arrives at the host stand, click <strong>"Seat Customer"</strong> to assign them to their table.
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

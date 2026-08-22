@@ -493,6 +493,44 @@ export const apiService = {
       console.warn(`apiService.getRestaurantAnalytics(${restaurantId}) error:`, err.message);
       return null;
     }
+  },
+
+  // 11. Virtual Waitlist & Queueing System (Phase 2)
+  joinWaitlist: async (payload) => {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/waitlist/join`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    return handleResponse(res);
+  },
+  getWaitlistStatus: async (restaurantId, email = '', ticketId = '') => {
+    const params = new URLSearchParams();
+    if (email) params.append('email', email);
+    if (ticketId) params.append('ticketId', ticketId);
+    const res = await fetchWithTimeout(`${API_BASE_URL}/waitlist/${restaurantId}/status?${params.toString()}`);
+    return handleResponse(res);
+  },
+  leaveWaitlist: async (ticketId) => {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/waitlist/${ticketId}/leave`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+  notifyWaitlistCustomer: async (ticketId) => {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/waitlist/${ticketId}/notify`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
+  },
+  seatWaitlistCustomer: async (ticketId) => {
+    const res = await fetchWithTimeout(`${API_BASE_URL}/waitlist/${ticketId}/seat`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return handleResponse(res);
   }
 };
 

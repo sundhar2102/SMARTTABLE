@@ -166,23 +166,41 @@ export const calculateWaitMetrics = (tables, activeOrders, partySize = 2) => {
 
   const nextAvailable = tableReleaseTimes[0].releaseTime;
 
+  // Compute tables coming soon (releasing within 15 mins)
+  const comingSoonTables = tableReleaseTimes.filter(t => t.releaseTime > 0 && t.releaseTime <= 15).length;
+
+  const estimatedMins = Math.round(estimatedWait);
+  const now = new Date();
+  const readyDate = new Date(now.getTime() + estimatedMins * 60000);
+  const estimatedReadyTime = readyDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   return {
     total_tables: totalTables,
     available_tables: availableTables,
     occupied_tables: occupiedTables,
     reserved_tables: reservedTables,
     cleaning_tables: cleaningTables,
+    coming_soon_tables: comingSoonTables,
     occupancy_percentage: occupancyPercentage,
-    estimated_wait_minutes: Math.round(estimatedWait),
+    estimated_wait_minutes: estimatedMins,
+    estimated_ready_time: estimatedReadyTime,
     availability,
     queue_count: queueCount,
     suitableTableId: targetTable,
     confidence: finalConfidence,
+    status_breakdown: {
+      AVAILABLE: availableTables,
+      OCCUPIED: occupiedTables,
+      RESERVED: reservedTables,
+      CLEANING: cleaningTables,
+      COMING_SOON: comingSoonTables
+    },
     factors: {
-      queuePosition: queueCount,
+      queuePosition: queueCount + 1,
       tablesOccupied: occupiedTables,
-      nextTableAvailableIn: Math.round(nextAvailable),
-      cleaningBuffer: 5
+      nextTableAvailableIn: Math.max(0, nextAvailable),
+      cleaningBuffer: 5,
+      estimatedReadyTime
     }
   };
 };

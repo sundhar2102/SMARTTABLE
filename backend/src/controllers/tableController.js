@@ -281,6 +281,18 @@ export const getRestaurantAvailability = async (req, res) => {
       }
     }
 
+    // Calculate table status breakdown across entire floor
+    const occupiedCount = allTables.filter(t => t.status === 'occupied').length;
+    const reservedCount = allTables.filter(t => t.status === 'reserved').length;
+    const cleaningCount = allTables.filter(t => t.status === 'cleaning').length;
+    const availableFloorCount = allTables.filter(t => t.status === 'available').length;
+    const comingSoonCount = allTables.filter(t => t.status === 'occupied' && t.mins_remaining !== null && t.mins_remaining <= 15).length;
+
+    const estimatedMins = availableTables.length > 0 ? 0 : (unavailableTables.length > 0 ? 25 : 35);
+    const now = new Date();
+    const readyDate = new Date(now.getTime() + estimatedMins * 60000);
+    const estimatedReadyTime = readyDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     return res.json({
       success: true,
       data: {
@@ -292,7 +304,16 @@ export const getRestaurantAvailability = async (req, res) => {
         availableCount: availableTables.length,
         availableTables,
         unavailableTables,
-        isBookable: availableTables.length > 0
+        isBookable: availableTables.length > 0,
+        estimatedWaitMinutes: estimatedMins,
+        estimatedReadyTime,
+        statusBreakdown: {
+          AVAILABLE: availableFloorCount,
+          OCCUPIED: occupiedCount,
+          RESERVED: reservedCount,
+          CLEANING: cleaningCount,
+          COMING_SOON: comingSoonCount
+        }
       }
     });
   } catch (error) {
