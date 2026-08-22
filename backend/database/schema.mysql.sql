@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS `reservations` (
     `party_size`             INT NOT NULL,
     `reservation_date`       DATE,
     `reservation_time`       TIME,
-    `status`                 VARCHAR(50) DEFAULT 'Confirmed',
+    `status`                 VARCHAR(50) DEFAULT 'Pending',
     `order_status`           VARCHAR(50) DEFAULT 'Received',
     `special_requests`       TEXT,
     `pre_ordered_items_json` JSON,

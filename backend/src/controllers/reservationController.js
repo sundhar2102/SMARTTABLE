@@ -288,7 +288,7 @@ export const getAllReservations = async (req, res) => {
     if (req.user.role === 'customer') {
       sql += ' WHERE (guest_email = ? OR user_id = ?)';
       params.push(req.user.email, req.user.id);
-    } else if (req.user.role === 'owner' || req.user.role === 'admin') {
+    } else if (req.user.role === 'owner') {
       const targetRestId = req.user.restaurantId || restaurantId;
       if (!targetRestId) {
         return res.status(400).json({ success: false, message: 'Missing restaurant ID' });
@@ -301,6 +301,11 @@ export const getAllReservations = async (req, res) => {
 
       sql += ' WHERE restaurant_id = ?';
       params.push(targetRestId);
+    } else if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+      if (restaurantId) {
+        sql += ' WHERE restaurant_id = ?';
+        params.push(restaurantId);
+      }
     } else {
       if (restaurantId) {
         sql += ' WHERE restaurant_id = ?';

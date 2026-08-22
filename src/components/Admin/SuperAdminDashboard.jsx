@@ -296,6 +296,19 @@ export const SuperAdminDashboard = () => {
             </button>
 
             <button
+              onClick={() => setActiveAdminTab('owners')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeAdminTab === 'owners' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Building2 className="w-4 h-4" />
+                <span>Restaurant Owners</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-bold">{restaurantOwners.length}</span>
+            </button>
+
+            <button
               onClick={() => setActiveAdminTab('bookings')}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeAdminTab === 'bookings' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -306,6 +319,18 @@ export const SuperAdminDashboard = () => {
                 <span>Bookings</span>
               </div>
               <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 font-bold">{totalBookingsCount}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveAdminTab('menu')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeAdminTab === 'menu' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <UtensilsCrossed className="w-4 h-4" />
+                <span>Menu Management</span>
+              </div>
             </button>
 
             <button
@@ -815,6 +840,164 @@ export const SuperAdminDashboard = () => {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* ===================================================================
+           SECTION 4.5: RESTAURANT OWNERS MANAGEMENT
+           =================================================================== */}
+        {activeAdminTab === 'owners' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Restaurant Owners Management</h1>
+                <p className="text-xs text-slate-400 mt-1">Manage verified restaurant owner accounts, assigned venues & account access</p>
+              </div>
+            </div>
+
+            {/* Restaurant Owners Table */}
+            <div className="glass-panel rounded-3xl border border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/90 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="p-4">Owner Name & Email</th>
+                      <th className="p-4">Mobile Number</th>
+                      <th className="p-4">Assigned Venue</th>
+                      <th className="p-4">Venue Bookings</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {restaurantOwners.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-500 font-medium">
+                          No restaurant owner accounts registered yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      restaurantOwners.map(o => {
+                        const ownerRest = restaurants.find(r => r.id === o.restaurantId || r.name === o.restaurantName);
+                        const venueBookingsCount = userReservations.filter(r => r.restaurantId === o.restaurantId).length;
+
+                        return (
+                          <tr key={o.id} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="p-4">
+                              <div className="space-y-0.5">
+                                <span className="font-bold text-white block text-sm">{o.name}</span>
+                                <span className="text-[11px] text-slate-400 font-mono block">{o.email}</span>
+                              </div>
+                            </td>
+
+                            <td className="p-4 font-mono">
+                              {o.phone || '+91 98400 12345'}
+                            </td>
+
+                            <td className="p-4">
+                              <span className="font-semibold text-emerald-400 block">{o.restaurantName || ownerRest?.name || 'Assigned Venue'}</span>
+                              <span className="text-[10px] text-slate-400">{ownerRest?.location || 'Main Location'}</span>
+                            </td>
+
+                            <td className="p-4 font-bold text-indigo-300">
+                              {venueBookingsCount} Bookings
+                            </td>
+
+                            <td className="p-4">
+                              {(!o.status || o.status === 'active') ? (
+                                <span className="badge-clean badge-low">Active Partner</span>
+                              ) : (
+                                <span className="badge-clean badge-high">Suspended</span>
+                              )}
+                            </td>
+
+                            <td className="p-4 text-right">
+                              <button
+                                onClick={() => toggleOwnerStatus(o.id)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 cursor-pointer"
+                              >
+                                {o.status === 'suspended' ? 'Reactivate' : 'Suspend'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+           SECTION 4.8: MENU MANAGEMENT
+           =================================================================== */}
+        {activeAdminTab === 'menu' && (
+          <div className="space-y-6 animate-in fade-in">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Platform Menu Management</h1>
+              <p className="text-xs text-slate-400 mt-1">Inspect and manage food menu items, prices & categories across all partner restaurants</p>
+            </div>
+
+            <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6">
+              <div className="flex items-center gap-3">
+                <label className="text-xs font-bold text-slate-400">Select Restaurant:</label>
+                <select
+                  value={selectedRestaurantId || restaurants[0]?.id}
+                  onChange={(e) => setSelectedRestaurantId(e.target.value)}
+                  className="input-clean text-xs font-bold max-w-xs"
+                >
+                  {restaurants.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} ({r.location})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Menu Categories */}
+              {(() => {
+                const targetRest = restaurants.find(r => r.id === (selectedRestaurantId || restaurants[0]?.id)) || restaurants[0];
+                const menuList = targetRest?.menu || [];
+
+                if (!menuList || menuList.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-slate-500 font-medium">
+                      No menu categories registered for this restaurant yet.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {menuList.map((cat, idx) => (
+                      <div key={idx} className="space-y-3">
+                        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider pb-1 border-b border-slate-800">
+                          {cat.category} ({cat.items.length} Items)
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {cat.items.map(item => (
+                            <div key={item.id} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-3">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${item.tags?.includes('v') ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                  <span className="font-bold text-white text-xs truncate">{item.name}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 truncate">{item.desc || 'No description'}</p>
+                                <span className="font-mono text-xs font-bold text-emerald-400">₹{item.price}</span>
+                              </div>
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                Available
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 
