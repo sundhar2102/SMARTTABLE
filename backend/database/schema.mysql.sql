@@ -115,6 +115,9 @@ CREATE TABLE IF NOT EXISTS `orders` (
     FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`id`) ON DELETE CASCADE,
     INDEX `idx_orders_restaurant` (`restaurant_id`),
     INDEX `idx_orders_user` (`user_id`),
+    INDEX `idx_orders_email` (`guest_email`),
+    INDEX `idx_orders_booking` (`booking_id`),
+    INDEX `idx_orders_restaurant_table` (`restaurant_id`, `table_id`),
     INDEX `idx_orders_status` (`status`),
     INDEX `idx_orders_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -142,6 +145,9 @@ CREATE TABLE IF NOT EXISTS `reservations` (
     FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants`(`id`) ON DELETE CASCADE,
     INDEX `idx_reservations_restaurant` (`restaurant_id`),
     INDEX `idx_reservations_user` (`user_id`),
+    INDEX `idx_reservations_email` (`guest_email`),
+    INDEX `idx_reservations_conflict` (`restaurant_id`, `reservation_date`, `status`),
+    INDEX `idx_reservations_created` (`created_at`),
     INDEX `idx_reservations_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -1,113 +1,172 @@
-import { queryAll, queryGet, queryRun } from '../../database/db.js';
+import { queryAll, queryGet, queryRun, getDb } from '../../database/db.js';
 import { calculateRestaurantMetrics } from '../utils/waitAlgorithm.js';
 import { invalidateRestaurantCache } from '../services/waitTimeService.js';
 
 export const createOrder = async (req, res) => {
-  try {
-    const {
-      restaurantId,
-      restaurantName,
-      fulfillmentType,
-      tableId,
-      tableName,
-      guestName,
-      guestEmail,
-      guestPhone,
-      partySize,
-      date,
-      time,
-      status,
-      orderStatus,
-      deliveryAddress,
-      deliveryLocality,
-      deliveryDistanceKm,
-      deliveryEtaMins,
-      deliveryFee,
-      tipAmount,
-      itemTotal,
-      grandTotal,
-      riderId,
-      riderName,
-      items, // pre_ordered_items_json
-      specialRequests
-    } = req.body;
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const db = await getDb();
+    const connection = await db.getConnection();
 
-    const orderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    const qrCode = `SMART-TABLE-${orderId}-${(restaurantName || 'ST').substring(0, 2).toUpperCase()}`;
-
-    const userId = req.user ? req.user.id : null;
-    const finalEmail = (req.user && req.user.email) || guestEmail || 'diner@example.com';
-    const finalName = (req.user && req.user.name) || guestName || 'Verified Diner';
-    const bookingId = req.body.bookingId || req.body.booking_id || null;
-
-    await queryRun(
-      `INSERT INTO orders (
-        id, restaurant_id, restaurant_name, fulfillment_type, table_id, table_name,
-        guest_name, guest_email, guest_phone, party_size, reservation_date, reservation_time,
-        status, order_status, delivery_address, delivery_locality, delivery_distance_km,
-        delivery_eta_mins, delivery_fee, tip_amount, item_total, grand_total, rider_id, rider_name,
-        pre_ordered_items_json, special_requests, qr_code, user_id, booking_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        orderId,
+    try {
+      const {
         restaurantId,
-        restaurantName || 'Restaurant',
-        fulfillmentType || 'dine-in',
-        tableId || null,
-        tableName || null,
-        finalName,
-        finalEmail,
-        guestPhone || '',
-        Number(partySize) || 1,
-        date || '',
-        time || '',
-        status || 'Confirmed',
-        orderStatus || 'Pending Acceptance',
-        deliveryAddress || null,
-        deliveryLocality || null,
-        deliveryDistanceKm || null,
-        deliveryEtaMins || null,
-        deliveryFee || 0,
-        tipAmount || 0,
-        itemTotal || 0,
-        grandTotal || 0,
-        riderId || null,
-        riderName || null,
-        JSON.stringify(items || []),
-        specialRequests || '',
-        qrCode,
-        userId,
-        bookingId
-      ]
-    );
+        restaurantName,
+        fulfillmentType,
+        tableId,
+        tableName,
+        guestName,
+        guestEmail,
+        guestPhone,
+        partySize,
+        date,
+        time,
+        status,
+        orderStatus,
+        deliveryAddress,
+        deliveryLocality,
+        deliveryDistanceKm,
+        deliveryEtaMins,
+        deliveryFee,
+        tipAmount,
+        itemTotal,
+        grandTotal,
+        riderId,
+        riderName,
+        items, // pre_ordered_items_json
+        specialRequests
+      } = req.body;
 
-    const createdOrder = await queryGet('SELECT * FROM orders WHERE id = ?', [orderId]);
-    
-    // Invalidate cached wait times
-    invalidateRestaurantCache(restaurantId);
+      const orderId = req.body.id || `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+      const qrCode = `SMART-TABLE-${orderId}-${(restaurantName || 'ST').substring(0, 2).toUpperCase()}`;
 
-    // Get dynamic metrics
-    const metrics = await calculateRestaurantMetrics(restaurantId);
+      const userId = req.user ? req.user.id : null;
+      const finalEmail = (req.user && req.user.email) || guestEmail || 'diner@example.com';
+      const finalName = (req.user && req.user.name) || guestName || 'Verified Diner';
+      const bookingId = req.body.bookingId || req.body.booking_id || null;
 
-    // Emit real-time event for owner dashboard
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`restaurant_${restaurantId}_private`).emit('new_order', createdOrder);
-      // Emit new deterministic occupancy event
-      io.to(`restaurant_${restaurantId}_public`).emit('restaurant_occupancy_updated', {
-        restaurantId,
-        metrics
+      await connection.beginTransaction();
+
+      // 1. Fetch active orders locked FOR UPDATE (blocks concurrent duplicate order creation)
+      const [activeOrders] = await connection.query(
+        `SELECT * FROM orders 
+         WHERE restaurant_id = ? 
+           AND (guest_email = ? OR (user_id IS NOT NULL AND user_id = ?))
+           AND status != 'Cancelled'
+         FOR UPDATE`,
+        [restaurantId, finalEmail, userId]
+      );
+
+      // 0. Deduplication check:
+      // If booking_id provided, check if an order already exists for this booking
+      if (bookingId) {
+        const existingBooking = activeOrders.find(o => o.booking_id === bookingId);
+        if (existingBooking) {
+          await connection.rollback();
+          return res.status(200).json({
+            success: true,
+            isDuplicate: true,
+            message: 'Existing order returned for booking (duplicate suppressed)',
+            data: existingBooking
+          });
+        }
+      }
+
+      // Check duplicate recent submission with same total
+      const existingRecent = activeOrders.find(o => 
+        Number(o.grand_total) === Number(grandTotal || 0) &&
+        (o.fulfillment_type === (fulfillmentType || 'dine-in'))
+      );
+
+      if (existingRecent) {
+        await connection.rollback();
+        return res.status(200).json({
+          success: true,
+          isDuplicate: true,
+          message: 'Existing order returned (duplicate request suppressed)',
+          data: existingRecent
+        });
+      }
+
+      await connection.query(
+        `INSERT INTO orders (
+          id, restaurant_id, restaurant_name, fulfillment_type, table_id, table_name,
+          guest_name, guest_email, guest_phone, party_size, reservation_date, reservation_time,
+          status, order_status, delivery_address, delivery_locality, delivery_distance_km,
+          delivery_eta_mins, delivery_fee, tip_amount, item_total, grand_total, rider_id, rider_name,
+          pre_ordered_items_json, special_requests, qr_code, user_id, booking_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderId,
+          restaurantId,
+          restaurantName || 'Restaurant',
+          fulfillmentType || 'dine-in',
+          tableId || null,
+          tableName || null,
+          finalName,
+          finalEmail,
+          guestPhone || '',
+          Number(partySize) || 1,
+          date || '',
+          time || '',
+          status || 'Confirmed',
+          orderStatus || 'Pending Acceptance',
+          deliveryAddress || null,
+          deliveryLocality || null,
+          deliveryDistanceKm || null,
+          deliveryEtaMins || null,
+          deliveryFee || 0,
+          tipAmount || 0,
+          itemTotal || 0,
+          grandTotal || 0,
+          riderId || null,
+          riderName || null,
+          JSON.stringify(items || []),
+          specialRequests || '',
+          qrCode,
+          userId,
+          bookingId
+        ]
+      );
+
+      const [rows] = await connection.query('SELECT * FROM orders WHERE id = ?', [orderId]);
+      const createdOrder = rows[0];
+
+      await connection.commit();
+      
+      // Invalidate cached wait times
+      invalidateRestaurantCache(restaurantId);
+
+      // Get dynamic metrics
+      const metrics = await calculateRestaurantMetrics(restaurantId);
+
+      // Emit real-time event for owner dashboard
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`restaurant_${restaurantId}_private`).emit('new_order', createdOrder);
+        // Emit new deterministic occupancy event
+        io.to(`restaurant_${restaurantId}_public`).emit('restaurant_occupancy_updated', {
+          restaurantId,
+          metrics
+        });
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: 'Order placed successfully',
+        data: createdOrder
       });
+    } catch (error) {
+      await connection.rollback();
+      if ((error.code === 'ER_LOCK_DEADLOCK' || error.errno === 1213) && attempt < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 60 * (attempt + 1)));
+        continue;
+      }
+      console.error('Error in createOrder:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    } finally {
+      connection.release();
     }
-
-    res.status(201).json({
-      success: true,
-      message: 'Order placed successfully',
-      data: createdOrder
-    });
-  } catch (error) {
-    console.error('Error in createOrder:', error);
-    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -214,23 +273,34 @@ export const getOrderById = async (req, res) => {
 };
 
 export const updateOrderStatus = async (req, res) => {
+  const db = await getDb();
+  const connection = await db.getConnection();
+
   try {
     const { id } = req.params;
     const { orderStatus } = req.body;
 
-    const orderItem = await queryGet('SELECT * FROM orders WHERE id = ?', [id]);
-    if (!orderItem) {
+    await connection.beginTransaction();
+
+    const [orderRows] = await connection.query('SELECT * FROM orders WHERE id = ? FOR UPDATE', [id]);
+    if (orderRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    await queryRun('UPDATE orders SET order_status = ? WHERE id = ?', [orderStatus, id]);
+    const orderItem = orderRows[0];
+
+    await connection.query('UPDATE orders SET order_status = ? WHERE id = ?', [orderStatus, id]);
     
     // Synchronize with the connected reservation if it exists
     if (orderItem.booking_id) {
-      await queryRun('UPDATE reservations SET order_status = ? WHERE id = ?', [orderStatus, orderItem.booking_id]);
+      await connection.query('UPDATE reservations SET order_status = ? WHERE id = ?', [orderStatus, orderItem.booking_id]);
     }
     
-    const updatedOrder = await queryGet('SELECT * FROM orders WHERE id = ?', [id]);
+    const [updatedRows] = await connection.query('SELECT * FROM orders WHERE id = ?', [id]);
+    const updatedOrder = updatedRows[0];
+
+    await connection.commit();
 
     // Invalidate cached wait times
     invalidateRestaurantCache(updatedOrder.restaurant_id);
@@ -271,7 +341,10 @@ export const updateOrderStatus = async (req, res) => {
       data: updatedOrder
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error in updateOrderStatus:', error);
     res.status(500).json({ success: false, message: error.message });
+  } finally {
+    connection.release();
   }
 };

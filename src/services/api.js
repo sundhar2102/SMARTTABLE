@@ -1,6 +1,27 @@
 // API Client Service for SmartTable AI Backend (REST API on port 5000)
 
 const API_BASE_URL = '/api';
+const DEFAULT_TIMEOUT_MS = 15000;
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    return response;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timeout: The server took longer than ${timeoutMs / 1000}s to respond.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 const handleResponse = async (response) => {
   if (!response.ok) {
@@ -23,7 +44,7 @@ export const apiService = {
   // 1. Health check
   checkHealth: async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/health`);
+      const res = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 5000);
       return await handleResponse(res);
     } catch (err) {
       console.warn('Backend server offline or unreachable:', err.message);
@@ -38,7 +59,7 @@ export const apiService = {
       if (lat !== null && lng !== null) {
         url += `?lat=${lat}&lng=${lng}`;
       }
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       const json = await handleResponse(res);
       return json?.data || [];
     } catch (err) {
@@ -49,7 +70,7 @@ export const apiService = {
 
   getRestaurantById: async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/restaurants/${id}`);
+      const res = await fetchWithTimeout(`${API_BASE_URL}/restaurants/${id}`);
       const json = await handleResponse(res);
       return json?.data || null;
     } catch (err) {
@@ -65,7 +86,7 @@ export const apiService = {
         return { all: [], smarttable: [], osm: [], message: 'Location required.' };
       }
       const url = `${API_BASE_URL}/restaurants/nearby?lat=${lat}&lng=${lng}&radius=${radiusKm}`;
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url);
       const json = await handleResponse(res);
       const all = json?.data || [];
       return {
@@ -85,7 +106,7 @@ export const apiService = {
   // 3. Table live status update (Floor Seating Radar)
   updateTableStatus: async (restaurantId, tableId, status, minsRemaining = null, reservationName = null) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/tables/${restaurantId}/${tableId}/status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/tables/${restaurantId}/${tableId}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status, minsRemaining, reservationName })
@@ -100,7 +121,7 @@ export const apiService = {
   // 4. Restaurant Live Crowd Level Update
   updateRestaurantCrowdLevel: async (restaurantId, crowdLevel) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}/crowd-level`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/restaurants/${restaurantId}/crowd-level`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ crowdLevel })
@@ -121,7 +142,7 @@ export const apiService = {
       if (restaurantId) params.append('restaurantId', restaurantId);
       if (params.toString()) url += `?${params.toString()}`;
 
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: getAuthHeaders()
       });
       const json = await handleResponse(res);
@@ -134,7 +155,7 @@ export const apiService = {
 
   createReservation: async (reservationData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/reservations`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/reservations`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(reservationData)
@@ -148,7 +169,7 @@ export const apiService = {
 
   updateReservationOrderStatus: async (id, orderStatus) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}/order-status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/reservations/${id}/order-status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ orderStatus })
@@ -162,7 +183,7 @@ export const apiService = {
 
   cancelReservation: async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/reservations/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -176,7 +197,7 @@ export const apiService = {
   // 6. Orders
   getAllOrders: async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/orders`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/orders`, {
         headers: getAuthHeaders()
       });
       const json = await handleResponse(res);
@@ -189,7 +210,7 @@ export const apiService = {
 
   getOrdersByCustomer: async (email) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/orders/customer?email=${encodeURIComponent(email)}`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/orders/customer?email=${encodeURIComponent(email)}`, {
         headers: getAuthHeaders()
       });
       const json = await handleResponse(res);
@@ -202,7 +223,7 @@ export const apiService = {
 
   getOrdersByRestaurant: async (restaurantId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/orders/restaurant/${restaurantId}`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/orders/restaurant/${restaurantId}`, {
         headers: getAuthHeaders()
       });
       const json = await handleResponse(res);
@@ -215,7 +236,7 @@ export const apiService = {
 
   createOrder: async (orderData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/orders`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/orders`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(orderData)
@@ -230,7 +251,7 @@ export const apiService = {
 
   updateOrder: async (id, orderStatus) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/orders/${id}/status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/orders/${id}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ orderStatus })
@@ -245,7 +266,7 @@ export const apiService = {
   // 7. AI Predictor
   predictWalkIn: async (predictionData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/ai/predict`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/ai/predict`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(predictionData)
@@ -261,7 +282,7 @@ export const apiService = {
   // 7. Authentication & Registration
   login: async (credentials) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials)
@@ -275,7 +296,7 @@ export const apiService = {
 
   async verifyOTP(email, otp) {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
@@ -289,7 +310,7 @@ export const apiService = {
 
   register: async (registrationData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationData)
@@ -304,7 +325,7 @@ export const apiService = {
   // 8. Payments
   initiatePayment: async (paymentData) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/payments/checkout`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/payments/checkout`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(paymentData)
@@ -319,16 +340,16 @@ export const apiService = {
   // 9. Super Admin — User & Platform Management (Phase 6)
   admin: {
     getStats: async () => {
-      const res = await fetch(`${API_BASE_URL}/admin/stats`, { headers: getAuthHeaders() });
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/stats`, { headers: getAuthHeaders() });
       return handleResponse(res);
     },
     getUsers: async (params = {}) => {
       const qs = new URLSearchParams(params).toString();
-      const res = await fetch(`${API_BASE_URL}/admin/users${qs ? '?' + qs : ''}`, { headers: getAuthHeaders() });
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/users${qs ? '?' + qs : ''}`, { headers: getAuthHeaders() });
       return handleResponse(res);
     },
     updateUserStatus: async (userId, status) => {
-      const res = await fetch(`${API_BASE_URL}/admin/users/${userId}/status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/users/${userId}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status })
@@ -336,18 +357,18 @@ export const apiService = {
       return handleResponse(res);
     },
     deleteUser: async (userId) => {
-      const res = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/users/${userId}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
       return handleResponse(res);
     },
     getOwners: async () => {
-      const res = await fetch(`${API_BASE_URL}/admin/owners`, { headers: getAuthHeaders() });
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/owners`, { headers: getAuthHeaders() });
       return handleResponse(res);
     },
     updateOwnerStatus: async (ownerId, status) => {
-      const res = await fetch(`${API_BASE_URL}/admin/owners/${ownerId}/status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/owners/${ownerId}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status })
@@ -355,11 +376,11 @@ export const apiService = {
       return handleResponse(res);
     },
     getRestaurants: async () => {
-      const res = await fetch(`${API_BASE_URL}/admin/restaurants`, { headers: getAuthHeaders() });
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/restaurants`, { headers: getAuthHeaders() });
       return handleResponse(res);
     },
     updateRestaurantStatus: async (restaurantId, isAcceptingOrders) => {
-      const res = await fetch(`${API_BASE_URL}/admin/restaurants/${restaurantId}/status`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/restaurants/${restaurantId}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ isAcceptingOrders })

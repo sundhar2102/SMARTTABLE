@@ -89,7 +89,12 @@ const _performInit = async () => {
       user: DB_CONFIG.user,
       password: DB_CONFIG.password,
       database: DB_CONFIG.database,
-      connectionLimit: DB_CONFIG.connectionLimit,
+      connectionLimit: DB_CONFIG.connectionLimit || 15,
+      waitForConnections: true,
+      queueLimit: 0,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      connectTimeout: 10000,
       multipleStatements: true // Required for running schema and transactions
     });
 
@@ -119,6 +124,25 @@ const _performInit = async () => {
     try {
       await connection.query("UPDATE `users` SET `status` = 'active' WHERE `status` IS NULL OR `status` = ''");
     } catch (e) {}
+
+    // Phase 9: Performance Indexes for high-frequency queries
+    const performanceIndexes = [
+      "ALTER TABLE `reservations` ADD INDEX `idx_reservations_email` (`guest_email`)",
+      "ALTER TABLE `reservations` ADD INDEX `idx_reservations_conflict` (`restaurant_id`, `reservation_date`, `status`)",
+      "ALTER TABLE `reservations` ADD INDEX `idx_reservations_created` (`created_at`)",
+      "ALTER TABLE `orders` ADD INDEX `idx_orders_email` (`guest_email`)",
+      "ALTER TABLE `orders` ADD INDEX `idx_orders_booking` (`booking_id`)",
+      "ALTER TABLE `orders` ADD INDEX `idx_orders_restaurant_table` (`restaurant_id`, `table_id`)",
+      "ALTER TABLE `users` ADD INDEX `idx_users_role_status` (`role`, `status`)"
+    ];
+
+    for (const idxQuery of performanceIndexes) {
+      try {
+        await connection.query(idxQuery);
+      } catch (e) {
+        // Silently ignore duplicate index errors
+      }
+    }
     
     connection.release();
 

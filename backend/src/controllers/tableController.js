@@ -1,8 +1,11 @@
-import { queryAll, queryGet, queryRun } from '../../database/db.js';
+import { queryAll, queryGet, queryRun, getDb } from '../../database/db.js';
 import { calculateRestaurantMetrics } from '../utils/waitAlgorithm.js';
 import { invalidateRestaurantCache } from '../services/waitTimeService.js';
 
 export const updateTableStatus = async (req, res) => {
+  const db = await getDb();
+  const connection = await db.getConnection();
+
   try {
     const { restaurantId, tableId } = req.params;
     const { status, minsRemaining, reservationName } = req.body;
@@ -13,30 +16,38 @@ export const updateTableStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: `Invalid status: ${status}. Must be one of [${validStatuses.join(', ')}]` });
     }
 
+    await connection.beginTransaction();
+
     // 1. Verify restaurant exists
-    const restaurant = await queryGet('SELECT * FROM restaurants WHERE id = ?', [restaurantId]);
-    if (!restaurant) {
+    const [restaurantRows] = await connection.query('SELECT * FROM restaurants WHERE id = ?', [restaurantId]);
+    if (restaurantRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    // 2. Verify table exists
-    const table = await queryGet(
-      'SELECT * FROM `tables` WHERE id = ? AND restaurant_id = ?',
+    // 2. Verify table exists with lock FOR UPDATE
+    const [tableRows] = await connection.query(
+      'SELECT * FROM `tables` WHERE id = ? AND restaurant_id = ? FOR UPDATE',
       [tableId, restaurantId]
     );
 
-    if (!table) {
+    if (tableRows.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ success: false, message: 'Table not found' });
     }
+
+    const table = tableRows[0];
 
     // 2.5. Validate allowed status transitions
     const fromStatus = table.status;
     const toStatus = status;
     if (fromStatus !== toStatus) {
       if (fromStatus === 'occupied' && toStatus === 'reserved') {
+        await connection.rollback();
         return res.status(400).json({ success: false, message: 'Invalid transition: occupied table cannot transition directly to reserved.' });
       }
       if (fromStatus === 'cleaning' && toStatus === 'reserved') {
+        await connection.rollback();
         return res.status(400).json({ success: false, message: 'Invalid transition: cleaning table cannot transition directly to reserved.' });
       }
     }
@@ -53,7 +64,7 @@ export const updateTableStatus = async (req, res) => {
         duration = Number(updatedMins);
       } else {
         // Deterministically check active orders for this table first
-        const activeOrders = await queryAll(`
+        const [activeOrders] = await connection.query(`
           SELECT * FROM orders 
           WHERE restaurant_id = ? 
             AND table_id = ?
@@ -88,7 +99,7 @@ export const updateTableStatus = async (req, res) => {
       updatedMins = 15; // default reserved buffer
     }
 
-    await queryRun(
+    await connection.query(
       `UPDATE \`tables\` 
        SET status = ?, mins_remaining = ?, reservation_name = ?,
            occupied_at = ?, expected_available_at = ?, cleaning_started_at = ?
@@ -97,10 +108,13 @@ export const updateTableStatus = async (req, res) => {
     );
 
     // Re-fetch the complete updated table row
-    const updatedTable = await queryGet(
+    const [updatedTableRows] = await connection.query(
       'SELECT * FROM `tables` WHERE id = ? AND restaurant_id = ?',
       [tableId, restaurantId]
     );
+    const updatedTable = updatedTableRows[0];
+
+    await connection.commit();
 
     // Invalidate cached wait times
     invalidateRestaurantCache(restaurantId);
@@ -150,7 +164,10 @@ export const updateTableStatus = async (req, res) => {
       }
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error in updateTableStatus:', error);
     res.status(500).json({ success: false, message: error.message });
+  } finally {
+    connection.release();
   }
 };

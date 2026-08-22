@@ -235,6 +235,8 @@ export const AppProvider = ({ children }) => {
     const joinRoom = () => {
       console.log(`[Socket] Emitting join_restaurant for ${selectedRestaurantId}`);
       socket.emit('join_restaurant', selectedRestaurantId);
+      // Automatically resync authoritative MySQL data on connect/reconnect
+      fetchLiveBackendData();
     };
 
     if (socket.connected) {
