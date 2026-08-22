@@ -417,7 +417,7 @@ export const PayBillModal = () => {
               <div className="space-y-3">
                 <label className="text-xs font-bold text-white block">Select Payment Method:</label>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
                     { id: 'upi', label: '⚡ Instant UPI', sub: 'GPay, PhonePe, Paytm' },
                     { id: 'card', label: '💳 Cards', sub: 'Debit / Credit' },

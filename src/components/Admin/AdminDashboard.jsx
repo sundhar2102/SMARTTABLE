@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { playOrderAlert } from '../../utils/audioUtils';
 import { PaymentGatewayModal } from './PaymentGatewayModal';
+import { apiService } from '../../services/api';
 
 export const AdminDashboard = () => {
   const { 
@@ -68,10 +69,15 @@ export const AdminDashboard = () => {
 
   const pendingApplicationsCount = restaurantApplications ? restaurantApplications.filter(a => a.status === 'pending').length : 0;
 
-  const [activeAdminTab, setActiveAdminTab] = useState('reservations'); // 'reservations' | 'floor' | 'billing' | 'crowd_settings'
+  const [activeAdminTab, setActiveAdminTab] = useState('reservations'); // 'reservations' | 'floor' | 'billing' | 'crowd_settings' | 'analytics'
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [soundAlertsEnabled, setSoundAlertsEnabled] = useState(true);
+
+  // Phase 11 Analytics State
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(null);
 
   // Dynamic live countdown clock for tables
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -125,11 +131,38 @@ export const AdminDashboard = () => {
     );
   }
 
+  const fetchPropertyAnalytics = async (restaurantId) => {
+    if (!restaurantId) return;
+    setIsLoadingAnalytics(true);
+    setAnalyticsError(null);
+    try {
+      const data = await apiService.getRestaurantAnalytics(restaurantId);
+      if (data) {
+        setAnalyticsData(data);
+      } else {
+        setAnalyticsError('Unable to load authoritative analytics telemetry from server.');
+      }
+    } catch (err) {
+      setAnalyticsError(err.message || 'Failed to fetch analytics');
+    } finally {
+      setIsLoadingAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminTab === 'analytics' && currentRest?.id) {
+      fetchPropertyAnalytics(currentRest.id);
+    }
+  }, [activeAdminTab, currentRest?.id]);
+
   const handlePropertyChange = (newRestId) => {
     setSelectedRestaurantId(newRestId);
     window.location.hash = `admin?restaurant=${newRestId}`;
     const target = restaurants.find(r => r.id === newRestId);
     triggerToast('Console Switched 👑', `Now managing live table operations for ${target?.name}.`, 'info');
+    if (activeAdminTab === 'analytics') {
+      fetchPropertyAnalytics(newRestId);
+    }
   };
 
   const totalTables = currentRest?.total_tables ?? (currentRest?.tables ? currentRest.tables.length : 5);
@@ -336,7 +369,7 @@ export const AdminDashboard = () => {
       </div>
 
       {/* KPI Metric Cards + Real-Time Wait Auto-Calculator Widget */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
         {/* Metric 1: Vacancy */}
         <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-1 shadow-xs">
@@ -429,12 +462,24 @@ export const AdminDashboard = () => {
           onClick={() => setActiveAdminTab('crowd_settings')}
           className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-xs ${
             activeAdminTab === 'crowd_settings'
-              ? 'bg-gradient-to-r from-gray-400 to-orange-600 text-white shadow-md'
-              : 'text-gray-400 hover:text-gray-200 bg-gray-900/60'
+              ? 'bg-[#0a0d0a] text-white'
+              : 'text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
           }`}
         >
           <Sliders className="w-4 h-4" />
           <span>Crowd & Wait Calibrator</span>
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('analytics')}
+          className={`px-4 py-2.5 rounded-xl transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-xs ${
+            activeAdminTab === 'analytics'
+              ? 'bg-[#0a0d0a] text-white shadow-md'
+              : 'text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-emerald-600" />
+          <span>Analytics & Smart Predictions</span>
         </button>
       </div>
 
@@ -1118,6 +1163,305 @@ export const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: REAL ANALYTICS & SMART PREDICTIONS (Phase 11) */}
+      {activeAdminTab === 'analytics' && (
+        <div className="space-y-6">
+          
+          {/* Header Bar */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Property Performance & Smart Predictions</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  MYSQL REAL-TIME DATA
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Authoritative metrics computed directly from active tables, reservations, and order history.</p>
+            </div>
+
+            <button
+              onClick={() => fetchPropertyAnalytics(currentRest.id)}
+              disabled={isLoadingAnalytics}
+              className="btn-secondary text-xs h-9 px-3 self-start sm:self-auto cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAnalytics ? 'animate-spin' : ''}`} />
+              <span>{isLoadingAnalytics ? 'Computing...' : 'Refresh Live Telemetry'}</span>
+            </button>
+          </div>
+
+          {/* Loading Skeleton */}
+          {isLoadingAnalytics && !analyticsData && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200 h-28" />
+              ))}
+            </div>
+          )}
+
+          {/* Error Message */}
+          {analyticsError && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+              <span>{analyticsError}</span>
+              <button
+                onClick={() => fetchPropertyAnalytics(currentRest.id)}
+                className="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 text-xs"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Analytics Content */}
+          {analyticsData && (
+            <div className="space-y-6">
+
+              {/* Insufficient Historical Data Notice */}
+              {!analyticsData.hasData && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    <strong>New Property Notice:</strong> {analyticsData.insufficientDataMessage} Showing real-time table telemetry and baseline predictive models.
+                  </span>
+                </div>
+              )}
+
+              {/* SECTION 1: Real-Time Floor Telemetry */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Live Floor Telemetry (Real-Time State)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <LayoutGrid className="w-3.5 h-3.5 text-emerald-600" /> Live Floor Occupancy
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {analyticsData.realtime.occupancyPercentage}%
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {analyticsData.realtime.occupiedTables} of {analyticsData.realtime.totalTables} Tables In-Service
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Free Tables Right Now
+                    </span>
+                    <div className="text-2xl font-black text-emerald-600">
+                      {analyticsData.realtime.availableTables}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Ready for immediate walk-in seating
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" /> Current Wait Telemetry
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {analyticsData.realtime.liveEstimatedWaitMinutes <= 0 ? '0m' : `~${analyticsData.realtime.liveEstimatedWaitMinutes}m`}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium capitalize">
+                      Queue: {analyticsData.realtime.liveQueueCount} • Confidence: {analyticsData.realtime.liveConfidence}
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-indigo-600" /> Total Dining Capacity
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {analyticsData.realtime.totalSeatCapacity}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Guest covers across all sections
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* SECTION 2: Historical Order & Revenue Metrics */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Historical Sales & Fulfillment Analytics (MySQL Records)</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Total Gross Revenue
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      ₹{analyticsData.historical.totalRevenue.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      From {analyticsData.historical.successfulOrders} fulfilled orders
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <Receipt className="w-3.5 h-3.5 text-indigo-600" /> Average Order Value (AOV)
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      ₹{analyticsData.historical.avgOrderValue.toLocaleString('en-IN')}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Per table transaction
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" /> Total Orders Processed
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {analyticsData.historical.totalOrders}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Dine-in: {analyticsData.historical.fulfillmentBreakdown.dineIn} • Takeaway: {analyticsData.historical.fulfillmentBreakdown.takeaway} • Delivery: {analyticsData.historical.fulfillmentBreakdown.delivery}
+                    </span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-1">
+                    <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                      <CalendarCheck className="w-3.5 h-3.5 text-purple-600" /> Table Bookings Fulfilled
+                    </span>
+                    <div className="text-2xl font-black text-slate-900">
+                      {analyticsData.historical.confirmedReservations}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Cancellation Rate: {analyticsData.historical.cancellationRatePercent}% ({analyticsData.historical.cancelledReservations} cancelled)
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* SECTION 3: Charts & Breakdown (Hourly Traffic + Party Sizes + Smart Predictions) */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* Hourly Dining Traffic Distribution */}
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-4 lg:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">Hourly Booking & Traffic Profile</h4>
+                      <p className="text-xs text-slate-500">Distribution of dining reservations across service hours (11:00 AM – 10:00 PM)</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    {analyticsData.historical.hourlyDistribution.map(slot => {
+                      const maxCount = Math.max(1, ...analyticsData.historical.hourlyDistribution.map(s => s.count));
+                      const percent = Math.round((slot.count / maxCount) * 100);
+                      const isPeak = slot.count === maxCount && slot.count > 0;
+
+                      return (
+                        <div key={slot.hour} className="flex items-center gap-3 text-xs">
+                          <span className="w-20 text-slate-600 font-mono shrink-0">{slot.label}</span>
+                          <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden relative">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                isPeak ? 'bg-rose-500' : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.max(4, percent)}%` }}
+                            />
+                          </div>
+                          <span className="w-12 text-right font-bold text-slate-900 shrink-0">
+                            {slot.count} {slot.count === 1 ? 'res' : 'res'}
+                          </span>
+                          {isPeak && (
+                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 shrink-0">
+                              Peak Rush
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Deterministic Smart Predictions Card */}
+                <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">Smart Forecasts</h4>
+                      <p className="text-[11px] text-slate-500">Deterministic models</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Predicted Crowd Status</span>
+                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${
+                          analyticsData.predictions.crowdBadgeColor === 'rose' 
+                            ? 'bg-rose-500' 
+                            : analyticsData.predictions.crowdBadgeColor === 'orange'
+                              ? 'bg-orange-500'
+                              : analyticsData.predictions.crowdBadgeColor === 'amber'
+                                ? 'bg-amber-500'
+                                : 'bg-emerald-500'
+                        }`} />
+                        <span>{analyticsData.predictions.predictedCrowdLevel}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Based on active floor load + {analyticsData.predictions.upcomingReservationsNext2Hours} scheduled reservations next 2h.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Estimated Table Turnover</span>
+                      <div className="font-bold text-slate-900">
+                        ~{analyticsData.predictions.avgTableTurnoverMinutes} minutes
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Average dining session cycle for {currentRest.cuisine}.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Best Time to Visit (Lowest Wait)</span>
+                      <div className="font-bold text-emerald-700">
+                        {analyticsData.predictions.bestTimeToVisit}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Recommended slot for walk-ins based on historical floor vacancy.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-500">Party Size Demographics</span>
+                      <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px]">
+                        <div className="text-slate-600">1-2 Guests: <strong>{analyticsData.historical.partySizeDistribution.party_1_2}</strong></div>
+                        <div className="text-slate-600">3-4 Guests: <strong>{analyticsData.historical.partySizeDistribution.party_3_4}</strong></div>
+                        <div className="text-slate-600">5-6 Guests: <strong>{analyticsData.historical.partySizeDistribution.party_5_6}</strong></div>
+                        <div className="text-slate-600">7+ Guests: <strong>{analyticsData.historical.partySizeDistribution.party_7_plus}</strong></div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
         </div>
       )}
 

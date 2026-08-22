@@ -264,9 +264,9 @@ export const FloorMapViewer = ({ onTableSelect }) => {
         </div>
 
         {/* Hovered Table Details Floating Footer Bar */}
-        <div className="relative z-20 mt-4 p-3 rounded-xl bg-gray-900/90 border border-gray-800 flex items-center justify-between text-xs">
+        <div className="relative z-20 mt-4 p-3 rounded-xl bg-gray-900/90 border border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           {hoveredTable ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <span className="font-bold text-white text-sm">{hoveredTable.name}</span>
               <span className="text-gray-400">• Section: <strong className="text-gray-200">{hoveredTable.section}</strong></span>
               <span className="text-gray-400">• Capacity: <strong className="text-white">{hoveredTable.capacity} guests</strong></span>
@@ -282,12 +282,12 @@ export const FloorMapViewer = ({ onTableSelect }) => {
             </div>
           ) : (
             <div className="text-gray-400 flex items-center gap-2">
-              <Info className="w-4 h-4 text-white" />
-              <span>Hover over any table to view real-time occupancy status. Click green tables to initiate instant reservation.</span>
+              <Info className="w-4 h-4 text-white shrink-0" />
+              <span>Hover or tap any table to view status. Click green tables to reserve instantly.</span>
             </div>
           )}
 
-          <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
             <button
               onClick={() => openCrowdRadar(activeRestaurant)}
               className="px-3.5 py-2 rounded-xl bg-gray-900/80 hover:bg-amber-900 border border-gray-400/40 text-amber-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer"

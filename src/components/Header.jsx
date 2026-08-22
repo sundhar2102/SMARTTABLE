@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { 
@@ -9,7 +9,9 @@ import {
   CalendarCheck, 
   ShoppingBag, 
   Store, 
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 
 export const Header = () => {
@@ -27,44 +29,49 @@ export const Header = () => {
     setBookingModalOpen
   } = useApp();
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const activeReservationsCount = userReservations.filter(
     r => r.status === 'Confirmed' && r.orderStatus !== 'Completed' && r.orderStatus !== 'Cancelled'
   ).length;
 
+  const handleBrandClick = () => {
+    setMobileMenuOpen(false);
+    if (user?.role === 'admin') {
+      setViewMode('superadmin');
+    } else if (user?.role === 'owner') {
+      setViewMode('admin');
+    } else {
+      setViewMode('customer');
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-18 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-8 h-16 sm:h-18 flex items-center justify-between gap-2 sm:gap-4">
         
         {/* Left: Brand Logo */}
         <div 
-          onClick={() => {
-            if (user?.role === 'admin') {
-              setViewMode('superadmin');
-            } else if (user?.role === 'owner') {
-              setViewMode('admin');
-            } else {
-              setViewMode('customer');
-            }
-          }}
-          className="flex items-center gap-2.5 cursor-pointer select-none group"
+          onClick={handleBrandClick}
+          className="flex items-center gap-2 cursor-pointer select-none group shrink-0"
         >
-          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white transition-transform group-hover:scale-105 shadow-xs">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white transition-transform group-hover:scale-105 shadow-xs">
             <UtensilsCrossed className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-black text-slate-900 tracking-tight leading-none">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none">
                 SmartTable
               </span>
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
+              <span className="px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">
                 LIVE
               </span>
             </div>
           </div>
         </div>
 
-        {/* Right: Actions & Profile */}
-        <div className="flex items-center gap-2.5">
+        {/* Desktop & Tablet Actions */}
+        <div className="hidden sm:flex items-center gap-2">
           
           {/* Live Crowd Radar Button */}
           <button
@@ -79,11 +86,11 @@ export const Header = () => {
           {/* AI Wait Predictor Modal Trigger */}
           <button
             onClick={() => setAiPredictorOpen(true)}
-            className="hidden sm:inline-flex btn-secondary text-xs h-9 px-3"
+            className="btn-secondary text-xs h-9 px-3"
             title="Calculate AI Walk-in Wait Time Prediction"
           >
             <Bot className="w-3.5 h-3.5 text-emerald-600" />
-            <span>AI Predictor</span>
+            <span className="hidden md:inline">AI Predictor</span>
           </button>
 
           {/* Pre-Order Food Badge */}
@@ -105,7 +112,7 @@ export const Header = () => {
             title="View Active Table Bookings & Digital QR Passes"
           >
             <CalendarCheck className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden sm:inline">My Bookings</span>
+            <span className="hidden md:inline">My Bookings</span>
 
             {activeReservationsCount > 0 && (
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
@@ -117,7 +124,7 @@ export const Header = () => {
           {/* Partner With Us Button */}
           <button
             onClick={() => navigate('/register/owner')}
-            className="hidden sm:inline-flex btn-secondary text-xs h-9 px-3"
+            className="hidden lg:inline-flex btn-secondary text-xs h-9 px-3"
             title="Register a New Restaurant Partner"
           >
             <Store className="w-3.5 h-3.5 text-slate-600" />
@@ -127,7 +134,7 @@ export const Header = () => {
           {/* User Profile & Logout / Login */}
           {user?.isLoggedIn ? (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="hidden sm:flex flex-col items-end">
+              <div className="flex flex-col items-end">
                 <span className="text-xs font-bold text-slate-900 leading-tight">
                   {user.name}
                 </span>
@@ -148,14 +155,12 @@ export const Header = () => {
                 title="Logout and return to Landing Screen"
               >
                 <LogOut className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden md:inline">Logout</span>
               </button>
             </div>
           ) : (
             <button
-              onClick={() => {
-                navigate('/login');
-              }}
+              onClick={() => navigate('/login')}
               className="btn-primary text-xs h-9 px-4"
             >
               <User className="w-3.5 h-3.5" />
@@ -165,8 +170,133 @@ export const Header = () => {
 
         </div>
 
+        {/* Mobile Actions Bar (< 640px) */}
+        <div className="flex sm:hidden items-center gap-1.5">
+          {/* Pre-Order Food Badge */}
+          {preOrderItems.length > 0 && (
+            <button
+              onClick={() => setBookingModalOpen(true)}
+              className="btn-accent text-xs h-8 px-2 animate-pulse"
+              title="View Pre-ordered Food"
+            >
+              <ShoppingBag className="w-3 h-3" />
+              <span>({preOrderItems.reduce((acc, i) => acc + i.qty, 0)})</span>
+            </button>
+          )}
+
+          {/* My Bookings Quick Button */}
+          <button
+            onClick={() => setMyBookingsOpen(true)}
+            className="relative p-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+            title="My Bookings"
+          >
+            <CalendarCheck className="w-4 h-4" />
+            {activeReservationsCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">
+                {activeReservationsCount}
+              </span>
+            )}
+          </button>
+
+          {/* Mobile Menu Hamburger Toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg bg-slate-900 text-white hover:bg-black transition-all"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+        </div>
+
       </div>
+
+      {/* Mobile Slide-Down Menu */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-150">
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              openCrowdRadar();
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <Flame className="w-4 h-4 text-amber-500" />
+            <span>Live Crowd Radar</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setAiPredictorOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <Bot className="w-4 h-4 text-emerald-600" />
+            <span>AI Walk-in Table Predictor</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setMyBookingsOpen(true);
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <CalendarCheck className="w-4 h-4 text-indigo-600" />
+              <span>My Table Reservations</span>
+            </div>
+            {activeReservationsCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                {activeReservationsCount} Active
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              navigate('/register/owner');
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <Store className="w-4 h-4 text-slate-600" />
+            <span>Partner With Us (Register Restaurant)</span>
+          </button>
+
+          <div className="pt-2 border-t border-slate-100">
+            {user?.isLoggedIn ? (
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <div className="text-xs font-bold text-slate-900">{user.name}</div>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">{user.role}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logoutUser();
+                  }}
+                  className="btn-primary text-xs h-8 px-3"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  navigate('/login');
+                }}
+                className="w-full btn-primary text-xs h-9 justify-center"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Log In / Sign Up</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
-

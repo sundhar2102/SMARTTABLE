@@ -1,6 +1,15 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '.env') });
+
 import mysql from 'mysql2/promise';
+import jwt from 'jsonwebtoken';
 
 const API_BASE = 'http://localhost:5000/api';
+const JWT_SECRET = process.env.JWT_SECRET || 'local-development-secret-smarttable-key-2026';
 
 const runTests = async () => {
   console.log('--- Starting Phase 8 Security Tests ---\n');
@@ -18,7 +27,6 @@ const runTests = async () => {
   };
 
   try {
-    // 0. Fetch a valid owner and customer from the DB
     const connection = await mysql.createConnection({
       host: 'localhost',
       user: 'root',
@@ -26,8 +34,8 @@ const runTests = async () => {
       database: 'smarttable'
     });
 
-    const [owners] = await connection.query('SELECT email FROM users WHERE role = "owner" LIMIT 1');
-    const [customers] = await connection.query('SELECT email FROM users WHERE role = "customer" LIMIT 1');
+    const [owners] = await connection.query('SELECT id, email FROM users WHERE role = "owner" LIMIT 1');
+    const [customers] = await connection.query('SELECT id, email FROM users WHERE role = "customer" LIMIT 1');
     
     if (owners.length === 0 || customers.length === 0) {
       throw new Error("Missing owner or customer in DB for tests.");
@@ -37,31 +45,12 @@ const runTests = async () => {
     const customerEmail = customers[0].email;
     console.log(`Testing with owner: ${ownerEmail} and customer: ${customerEmail}`);
     
-    // We will bypass actual password by temporarily resetting it to a known one 
-    // or just using the default fallback if they don't have a hash.
-    // Actually, let's just reset their passwords to 'password' for testing.
-    const bcrypt = await import('bcryptjs');
-    const salt = await bcrypt.default.genSalt(10);
-    const hash = await bcrypt.default.hash('password', salt);
-    await connection.query('UPDATE users SET password_hash = ? WHERE email IN (?, ?)', [hash, ownerEmail, customerEmail]);
+    // Ensure active status
+    await connection.query('UPDATE users SET status = "active" WHERE email IN (?, ?)', [ownerEmail, customerEmail]);
 
-    // 1. Get tokens first (before rate limit blocks us)
-    console.log('Fetching auth tokens...');
-    const ownerRes = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ownerEmail, password: 'password' })
-    });
-    const ownerData = await ownerRes.json();
-    const ownerToken = ownerData.token;
-
-    const customerRes = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: customerEmail, password: 'password' })
-    });
-    const customerData = await customerRes.json();
-    const customerToken = customerData.token;
+    // Sign tokens directly with JWT_SECRET to be rate-limit immune
+    const ownerToken = jwt.sign({ id: owners[0].id }, JWT_SECRET, { expiresIn: '1h' });
+    const customerToken = jwt.sign({ id: customers[0].id }, JWT_SECRET, { expiresIn: '1h' });
 
     assert(ownerToken && customerToken, 'Successfully acquired test tokens');
 
@@ -111,8 +100,8 @@ const runTests = async () => {
     });
     const idorData = await idorRes.json();
     let noIdor = true;
-    const [customerRows] = await connection.query('SELECT id FROM users WHERE email = ?', [customerEmail]);
-    const customerId = customerRows[0].id;
+    const [custLookup] = await connection.query('SELECT id FROM users WHERE email = ?', [customerEmail]);
+    const customerId = custLookup[0].id;
     for (const r of idorData.data || []) {
       if (r.guestEmail !== customerEmail && r.userId !== customerId) {
         console.error(`IDOR failure detected: reservation guestEmail=${r.guestEmail}, userId=${r.userId} does not match customer ${customerEmail} / ${customerId}`);
@@ -120,6 +109,8 @@ const runTests = async () => {
       }
     }
     assert(noIdor, 'Customer can only view their own reservations (no IDOR)');
+
+    await connection.end();
 
     console.log('\n--- Tests Complete ---');
     console.log(`Passed: ${passed} | Failed: ${failed}`);

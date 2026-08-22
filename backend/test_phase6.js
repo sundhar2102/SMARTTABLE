@@ -43,15 +43,32 @@ const runPhase6Tests = async () => {
   console.log('🧪 Starting Phase 6 Live Integration Tests...\n');
 
   try {
+    const mysql = await import('mysql2/promise');
+    const conn = await mysql.default.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'smarttable'
+    });
+    const bcrypt = await import('bcryptjs');
+    const salt = await bcrypt.default.genSalt(10);
+    const dHash = await bcrypt.default.hash('user123', salt);
+    const oHash = await bcrypt.default.hash('owner123', salt);
+    const aHash = await bcrypt.default.hash('admin123', salt);
+    await conn.query('UPDATE users SET password_hash = ?, status = "active" WHERE email = "user@example.com"', [dHash]);
+    await conn.query('UPDATE users SET password_hash = ?, status = "active" WHERE email = "owner@restaurant.com"', [oHash]);
+    await conn.query('UPDATE users SET password_hash = ?, status = "active" WHERE email = "admin@smarttable.ai"', [aHash]);
+    await conn.end();
+
     // Setup - login to all 3 roles
     const dinerLogin = await login('user@example.com', 'user123');
-    dinerToken = dinerLogin.data.token;
+    dinerToken = dinerLogin.data?.data?.token || dinerLogin.data?.token;
     
     const ownerLogin = await login('owner@restaurant.com', 'owner123');
-    ownerToken = ownerLogin.data.token;
+    ownerToken = ownerLogin.data?.data?.token || ownerLogin.data?.token;
 
     const adminLogin = await login('admin@smarttable.ai', 'admin123');
-    adminToken = adminLogin.data.token;
+    adminToken = adminLogin.data?.data?.token || adminLogin.data?.token;
     
     if (!adminToken) {
       console.error("FATAL: Could not login as Admin. Aborting tests.");
@@ -180,7 +197,7 @@ const runPhase6Tests = async () => {
 
     // 21. Logout and login again, then verify the same authoritative MySQL state is returned.
     const t21Login = await login('admin@smarttable.ai', 'admin123');
-    const t21Token = t21Login.data.token;
+    const t21Token = t21Login.data?.data?.token || t21Login.data?.token;
     const t21 = await apiCall('GET', '/admin/users', t21Token);
     logTest(21, 'Logout/login state consistency', t21.status === 200 && t21.data.data.length === users.length, `Success`);
 

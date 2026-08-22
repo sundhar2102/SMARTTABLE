@@ -11,6 +11,7 @@ import {
   updateRestaurantStatus,
   getPlatformStats
 } from '../controllers/adminController.js';
+import { getPlatformAnalytics, getRestaurantAnalytics } from '../controllers/analyticsController.js';
 
 const router = express.Router();
 
@@ -18,8 +19,10 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireRole('admin'));
 
-// ── Platform Stats ──────────────────────────────────────────────────────────
+// ── Platform Stats & Analytics ──────────────────────────────────────────────
 router.get('/stats', getPlatformStats);
+router.get('/platform-analytics', getPlatformAnalytics);
+router.get('/analytics/:id', getRestaurantAnalytics);
 
 // ── User Management ─────────────────────────────────────────────────────────
 router.get('/users', listUsers);

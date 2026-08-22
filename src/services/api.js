@@ -337,10 +337,18 @@ export const apiService = {
     }
   },
 
-  // 9. Super Admin — User & Platform Management (Phase 6)
+  // 9. Super Admin — User & Platform Management (Phase 6 & 11)
   admin: {
     getStats: async () => {
       const res = await fetchWithTimeout(`${API_BASE_URL}/admin/stats`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    getPlatformAnalytics: async () => {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/platform-analytics`, { headers: getAuthHeaders() });
+      return handleResponse(res);
+    },
+    getRestaurantAnalytics: async (restaurantId) => {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/admin/analytics/${restaurantId}`, { headers: getAuthHeaders() });
       return handleResponse(res);
     },
     getUsers: async (params = {}) => {
@@ -386,6 +394,20 @@ export const apiService = {
         body: JSON.stringify({ isAcceptingOrders })
       });
       return handleResponse(res);
+    }
+  },
+
+  // 10. Real Analytics & Smart Predictions (Phase 11)
+  getRestaurantAnalytics: async (restaurantId) => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/restaurants/${restaurantId}/analytics`, {
+        headers: getAuthHeaders()
+      });
+      const json = await handleResponse(res);
+      return json?.data || null;
+    } catch (err) {
+      console.warn(`apiService.getRestaurantAnalytics(${restaurantId}) error:`, err.message);
+      return null;
     }
   }
 };

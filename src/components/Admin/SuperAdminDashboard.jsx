@@ -36,13 +36,14 @@ import {
   Database
 } from 'lucide-react';
 import { RestaurantApprovalsAdmin } from './RestaurantApprovalsAdmin';
+import { apiService } from '../../services/api';
 
 export const SuperAdminDashboard = () => {
   const { 
     registeredUsers, 
     toggleUserStatus, 
     deleteUser, 
-    addUser,
+    addUser, 
     restaurantOwners, 
     toggleOwnerStatus, 
     deleteOwner, 
@@ -65,6 +66,28 @@ export const SuperAdminDashboard = () => {
   const [ownerSearch, setOwnerSearch] = useState('');
   const [disputeSearch, setDisputeSearch] = useState('');
 
+  // Phase 11: Real Platform Analytics
+  const [platformAnalytics, setPlatformAnalytics] = useState(null);
+  const [isLoadingPlatformAnalytics, setIsLoadingPlatformAnalytics] = useState(false);
+  const [platformAnalyticsError, setPlatformAnalyticsError] = useState(null);
+
+  const fetchPlatformAnalytics = async () => {
+    setIsLoadingPlatformAnalytics(true);
+    setPlatformAnalyticsError(null);
+    try {
+      const res = await apiService.admin.getPlatformAnalytics();
+      if (res?.success && res.data) {
+        setPlatformAnalytics(res.data);
+      } else {
+        setPlatformAnalyticsError('Could not retrieve platform metrics.');
+      }
+    } catch (err) {
+      setPlatformAnalyticsError(err.message || 'Failed to fetch platform metrics');
+    } finally {
+      setIsLoadingPlatformAnalytics(false);
+    }
+  };
+
   // Modals for adding user/owner
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
   const [newUserName, setNewUserName] = useState('');
@@ -79,15 +102,17 @@ export const SuperAdminDashboard = () => {
   const [newOwnerRestId, setNewOwnerRestId] = useState(restaurants[0]?.id || '');
   const [newOwnerFssai, setNewOwnerFssai] = useState('');
 
-  // Phase 6: Load from MySQL on mount and on tab switch
+  // Phase 6 & 11: Load from MySQL on mount and on tab switch
   useEffect(() => {
     loadAdminUsers();
     loadAdminOwners();
+    fetchPlatformAnalytics();
   }, []);
 
   useEffect(() => {
     if (activeAdminTab === 'users') loadAdminUsers();
     if (activeAdminTab === 'owners') loadAdminOwners();
+    if (activeAdminTab === 'analytics') fetchPlatformAnalytics();
   }, [activeAdminTab]);
 
   // Metrics
@@ -186,7 +211,7 @@ export const SuperAdminDashboard = () => {
       </div>
 
       {/* KPI Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
         <div className="bg-white rounded-2xl p-5 border border-gray-200 space-y-1 shadow-xs">
           <span className="text-xs text-gray-500 font-bold flex items-center gap-1">
@@ -287,87 +312,141 @@ export const SuperAdminDashboard = () => {
         </button>
       </div>
 
-      {/* TAB 1: PLATFORM-WIDE ANALYTICS */}
+      {/* TAB 1: PLATFORM-WIDE ANALYTICS (Phase 11 Real MySQL Data) */}
       {activeAdminTab === 'analytics' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            
-            {/* Box 1: Platform Telemetry */}
-            <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Globe className="w-4 h-4 text-gray-400" />
-                Live Network Telemetry
-              </h3>
-              
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Total Registered Restaurants:</span>
-                  <span className="font-bold text-white">{restaurants.length}</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Total Live Tables Managed:</span>
-                  <span className="font-bold text-white">
-                    {restaurants.reduce((acc, r) => acc + (r.tables?.length || 0), 0)} Tables
-                  </span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Average Platform Occupancy:</span>
-                  <span className="font-bold text-amber-300">68% across Chennai</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-gray-400">Platform Take Rate:</span>
-                  <span className="font-bold text-purple-300">15.0% Standard Commission</span>
-                </div>
+
+          {/* Top Bar with Refresh Trigger */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Consolidated Network Analytics</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  MYSQL AUTHORITATIVE METRICS
+                </span>
               </div>
+              <p className="text-xs text-slate-500 mt-0.5">Authoritative metrics aggregated across all active dining properties, reservations, and orders.</p>
             </div>
 
-            {/* Box 2: Payment Gateways Breakdown */}
-            <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-white" />
-                Payment Gateway Volume
-              </h3>
-              
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Razorpay (UPI / Netbanking):</span>
-                  <span className="font-bold text-gray-400">62% (₹298,840)</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Stripe (Cards & Global):</span>
-                  <span className="font-bold text-gray-400">28% (₹134,960)</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-gray-400">Instant UPI Direct:</span>
-                  <span className="font-bold text-white">10% (₹48,200)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Box 3: City Cluster Activity */}
-            <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Award className="w-4 h-4 text-gray-300" />
-                Top Dining Hubs
-              </h3>
-              
-              <div className="space-y-2.5 text-xs">
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">Anna Nagar:</span>
-                  <span className="font-bold text-white">18 Active Restaurants</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-850">
-                  <span className="text-gray-400">T. Nagar:</span>
-                  <span className="font-bold text-amber-300">16 Active Restaurants</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-gray-400">Alwarpet / Mylapore:</span>
-                  <span className="font-bold text-gray-400">12 Active Restaurants</span>
-                </div>
-              </div>
-            </div>
-
+            <button
+              onClick={fetchPlatformAnalytics}
+              disabled={isLoadingPlatformAnalytics}
+              className="btn-secondary text-xs h-9 px-3 self-start sm:self-auto cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPlatformAnalytics ? 'animate-spin' : ''}`} />
+              <span>{isLoadingPlatformAnalytics ? 'Computing...' : 'Refresh Network Data'}</span>
+            </button>
           </div>
+
+          {/* Loading Skeleton */}
+          {isLoadingPlatformAnalytics && !platformAnalytics && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-white rounded-2xl p-6 border border-slate-200 h-48" />
+              ))}
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {platformAnalyticsError && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between">
+              <span>{platformAnalyticsError}</span>
+              <button
+                onClick={fetchPlatformAnalytics}
+                className="px-3 py-1 bg-rose-600 text-white rounded-lg font-bold hover:bg-rose-700 text-xs"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Real Metrics Grid */}
+          {platformAnalytics && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* Box 1: Platform Financial Volume */}
+              <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                  Financials & Gross Merchandise Value
+                </h3>
+                
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Total Processed GMV:</span>
+                    <span className="font-bold text-white">₹{platformAnalytics.totalGmv.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Platform Commission (15%):</span>
+                    <span className="font-bold text-emerald-400">₹{platformAnalytics.platformCommissionRevenue.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Average Order Value (AOV):</span>
+                    <span className="font-bold text-white">₹{platformAnalytics.avgOrderValue.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-400">Total Fulfilled Orders:</span>
+                    <span className="font-bold text-indigo-300">{platformAnalytics.totalOrders} Orders</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 2: Table Network Capacity */}
+              <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-indigo-400" />
+                  Network Capacity & Live Floor Utilization
+                </h3>
+                
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Total Managed Tables:</span>
+                    <span className="font-bold text-white">{platformAnalytics.totalTables} Tables</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Currently Occupied Tables:</span>
+                    <span className="font-bold text-amber-300">{platformAnalytics.occupiedTables} Occupied</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Currently Vacant Tables:</span>
+                    <span className="font-bold text-emerald-400">{platformAnalytics.availableTables} Available</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-400">Real-Time Floor Occupancy:</span>
+                    <span className="font-bold text-white">{platformAnalytics.systemUtilizationPercent}% System-Wide</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 3: User Base & Partner Portfolio */}
+              <div className="glass-card rounded-3xl p-6 border border-gray-800 space-y-4">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-400" />
+                  User Demographics & Ecosystem
+                </h3>
+                
+                <div className="space-y-2.5 text-xs">
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Registered Diners:</span>
+                    <span className="font-bold text-white">{platformAnalytics.customerCount} Diners</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Verified Restaurant Partners:</span>
+                    <span className="font-bold text-white">{platformAnalytics.ownerCount} Owners</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gray-850">
+                    <span className="text-gray-400">Total Reservations Recorded:</span>
+                    <span className="font-bold text-white">{platformAnalytics.totalReservations} ({platformAnalytics.confirmedReservations} Confirmed)</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-400">Active Accounts:</span>
+                    <span className="font-bold text-emerald-400">{platformAnalytics.activeUserCount} Active</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
         </div>
       )}
 
@@ -403,7 +482,7 @@ export const SuperAdminDashboard = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
+            <table className="w-full min-w-[600px] text-xs text-left">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-400 font-bold uppercase text-[10px]">
                   <th className="py-3 px-3">Diner Profile</th>
@@ -524,7 +603,7 @@ export const SuperAdminDashboard = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
+            <table className="w-full min-w-[600px] text-xs text-left">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-400 font-bold uppercase text-[10px]">
                   <th className="py-3 px-3">Owner Profile</th>

@@ -1,7 +1,16 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '.env') });
+
 import mysql from 'mysql2/promise';
 import { io } from 'socket.io-client';
+import jwt from 'jsonwebtoken';
 
 const API_BASE = 'http://localhost:5000/api';
+const JWT_SECRET = process.env.JWT_SECRET || 'local-development-secret-smarttable-key-2026';
 
 const runReliabilityTests = async () => {
   console.log('======================================================');
@@ -21,9 +30,8 @@ const runReliabilityTests = async () => {
     }
   };
 
-  // Database Connection
   const connection = await mysql.createConnection({
-    host: '127.0.0.1',
+    host: 'localhost',
     user: 'root',
     password: '',
     database: 'smarttable'
@@ -31,8 +39,8 @@ const runReliabilityTests = async () => {
 
   try {
     // 0. Setup test users and tokens
-    const [owners] = await connection.query('SELECT email, restaurant_id FROM users WHERE role = "owner" LIMIT 1');
-    const [customers] = await connection.query('SELECT email FROM users WHERE role = "customer" LIMIT 1');
+    const [owners] = await connection.query('SELECT id, email, restaurant_id FROM users WHERE role = "owner" LIMIT 1');
+    const [customers] = await connection.query('SELECT id, email FROM users WHERE role = "customer" LIMIT 1');
     const [restaurants] = await connection.query('SELECT id, name FROM restaurants LIMIT 1');
 
     if (owners.length === 0 || customers.length === 0 || restaurants.length === 0) {
@@ -44,32 +52,15 @@ const runReliabilityTests = async () => {
     const restaurantId = owners[0].restaurant_id || restaurants[0].id;
     const restaurantName = restaurants[0].name;
 
-    // Reset customer & owner password hash to test login
-    const bcrypt = await import('bcryptjs');
-    const salt = await bcrypt.default.genSalt(10);
-    const hash = await bcrypt.default.hash('password', salt);
-    await connection.query('UPDATE users SET password_hash = ? WHERE email IN (?, ?)', [hash, ownerEmail, customerEmail]);
+    // Ensure active status
+    await connection.query('UPDATE users SET status = "active" WHERE email IN (?, ?)', [ownerEmail, customerEmail]);
 
-    // Fetch customer token
-    const custLoginRes = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: customerEmail, password: 'password' })
-    });
-    const custLoginData = await custLoginRes.json();
-    const customerToken = custLoginData.token;
-
-    // Fetch owner token
-    const ownerLoginRes = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ownerEmail, password: 'password' })
-    });
-    const ownerLoginData = await ownerLoginRes.json();
-    const ownerToken = ownerLoginData.token;
+    // Sign tokens directly with JWT
+    const customerToken = jwt.sign({ id: customers[0].id }, JWT_SECRET, { expiresIn: '1h' });
+    const ownerToken = jwt.sign({ id: owners[0].id }, JWT_SECRET, { expiresIn: '1h' });
 
     console.log(`Testing with Restaurant: ${restaurantId}`);
-    console.log(`Customer: ${customerEmail}, Owner: ${ownerEmail}\n`);
+    console.log(`Customer: ${customerEmail} (Token: ${customerToken ? 'Present' : 'Missing'}), Owner: ${ownerEmail} (Token: ${ownerToken ? 'Present' : 'Missing'})\n`);
 
     // Clean up any existing test data for reliability runs
     const testDate = '2026-12-31';
