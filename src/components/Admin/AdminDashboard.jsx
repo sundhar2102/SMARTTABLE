@@ -122,15 +122,6 @@ export const AdminDashboard = () => {
 
   const currentRest = restaurants.find(r => r.id === selectedRestaurantId) || restaurants[0];
 
-  if (!currentRest) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in p-12 bg-white rounded-3xl border border-gray-200 shadow-sm flex flex-col items-center justify-center min-h-[300px]">
-        <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin mb-4" />
-        <p className="text-sm text-slate-500 font-medium">Loading restaurant data...</p>
-      </div>
-    );
-  }
-
   const fetchPropertyAnalytics = async (restaurantId) => {
     if (!restaurantId) return;
     setIsLoadingAnalytics(true);
@@ -154,6 +145,15 @@ export const AdminDashboard = () => {
       fetchPropertyAnalytics(currentRest.id);
     }
   }, [activeAdminTab, currentRest?.id]);
+
+  if (!currentRest) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in p-12 bg-white rounded-3xl border border-gray-200 shadow-sm flex flex-col items-center justify-center min-h-[300px]">
+        <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin mb-4" />
+        <p className="text-sm text-slate-500 font-medium">Loading restaurant data...</p>
+      </div>
+    );
+  }
 
   const handlePropertyChange = (newRestId) => {
     setSelectedRestaurantId(newRestId);
