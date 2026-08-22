@@ -33,12 +33,23 @@ export const createReservation = async (req, res) => {
 
       await connection.beginTransaction();
 
+      // 0. Verify restaurant is active and accepting table reservations
+      const [restRows] = await connection.query('SELECT * FROM restaurants WHERE id = ?', [restaurantId]);
+      if (restRows.length === 0) {
+        await connection.rollback();
+        return res.status(404).json({ success: false, message: 'Restaurant not found.' });
+      }
+      if (Number(restRows[0].is_accepting_orders) === 0 || restRows[0].status === 'deactivated') {
+        await connection.rollback();
+        return res.status(400).json({ success: false, message: 'Restaurant is deactivated or not accepting new table reservations.' });
+      }
+
       // 1. Fetch active reservations locked FOR UPDATE (blocks concurrent requests for same restaurant/date)
       const [activeReservations] = await connection.query(
         `SELECT * FROM reservations 
          WHERE restaurant_id = ? 
            AND reservation_date = ? 
-           AND status != 'Cancelled'
+           AND status NOT IN ('Cancelled', 'Rejected')
          FOR UPDATE`,
         [restaurantId, date]
       );
@@ -296,14 +307,12 @@ export const getAllReservations = async (req, res) => {
       sql += ' WHERE (guest_email = ? OR user_id = ?)';
       params.push(req.user.email, req.user.id);
     } else if (req.user.role === 'owner') {
+      if (req.user.restaurantId && restaurantId && req.user.restaurantId !== restaurantId) {
+        return res.status(403).json({ success: false, message: "Forbidden: You do not have permission to access another restaurant's reservations." });
+      }
       const targetRestId = req.user.restaurantId || restaurantId;
       if (!targetRestId) {
         return res.status(400).json({ success: false, message: 'Missing restaurant ID' });
-      }
-
-      // Enforce restaurant ownership check
-      if (req.user.restaurantId && req.user.restaurantId !== targetRestId) {
-        return res.status(403).json({ success: false, message: "Forbidden: You do not have permission to access this restaurant's reservations." });
       }
 
       sql += ' WHERE restaurant_id = ?';

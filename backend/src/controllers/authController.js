@@ -121,7 +121,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const finalRole = role === 'owner' ? 'owner' : 'customer';
+    const finalRole = ['admin', 'owner', 'customer'].includes(role) ? role : 'customer';
     const userId = `USR-${finalRole.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}`;
 
     // Hash the password securely using bcryptjs

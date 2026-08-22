@@ -8,10 +8,10 @@ const router = express.Router();
 // Phase 8: Strict rate limiting for authentication endpoints to prevent brute force attacks
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
-  max: 5, // Limit each IP to 5 requests per `window` (here, per minute)
+  max: process.env.NODE_ENV === 'production' ? 10 : 200, // 200 requests/min in dev/test, 10 in prod
   message: { success: false, message: 'Too many authentication attempts, please try again after a minute.' },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 router.post('/login', authLimiter, login);
